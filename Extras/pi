@@ -1,0 +1,59 @@
+#!/usr/bin/sh
+# Pi wrapper: run the agent inside a bubblewrap sandbox.
+#
+# Pi has no built-in sandbox and runs tools with the permissions of the user
+# account. This wrapper binds the whole filesystem read-only and re-binds only
+# the project directory plus a few state directories read-write, so a session
+# cannot write anywhere else under $HOME.
+
+real_pi=/usr/bin/pi
+bwrap=/usr/bin/bwrap
+
+agent_dir=${PI_CODING_AGENT_DIR:-"$HOME/.pi/agent"}
+cache_dir=${XDG_CACHE_HOME:-"$HOME/.cache"}
+
+# Package manager directories: npm cache and the Go install tree.
+npm_dir=${npm_config_cache:-"$HOME/.npm"}
+go_dir="$HOME/.local/share/go"
+
+if [ "${BWRAP:-1}" = "0" ]; then
+	echo "pi-wrapper: bwrap is not isolating the agent; pi runs with full permissions." >&2
+	sleep 1
+	exec "$real_pi" "$@"
+fi
+
+cwd=$(pwd -P)
+home_real=$(cd "$HOME" && pwd -P)
+
+host=$(hostname | tr -c 'A-Za-z0-9.-' '-')
+
+if [ "$cwd" = "$home_real" ]; then
+	echo "pi-wrapper: refusing to sandbox from $cwd (would expose \$HOME read-write). cd into a project directory." >&2
+	exit 1
+fi
+case "$home_real" in
+"$cwd"/*)
+	echo "pi-wrapper: refusing to sandbox from $cwd (would expose \$HOME read-write). cd into a project directory." >&2
+	exit 1
+	;;
+esac
+
+for d in "$agent_dir" "$cache_dir" "$npm_dir" "$go_dir"; do
+	mkdir -p "$d"
+done
+
+exec "$bwrap" \
+	--unshare-all \
+	--share-net \
+	--die-with-parent \
+	--hostname "$host-Pi-Isolated" \
+	--ro-bind / / \
+	--proc /proc \
+	--dev /dev \
+	--tmpfs /tmp \
+	--bind "$cwd" "$cwd" \
+	--bind "$agent_dir" "$agent_dir" \
+	--bind "$cache_dir" "$cache_dir" \
+	--bind "$npm_dir" "$npm_dir" \
+	--bind "$go_dir" "$go_dir" \
+	"$real_pi" "$@"

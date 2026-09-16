@@ -60,3 +60,5 @@ refactor(skill): reword output guidance
 
 - `browser-tools/` is its own subproject. Keep its details (setup, usage,
   patches, licensing) in its own Markdown files, not in the root README.
+- `Extras/` is its own subproject. Keep wrapper behavior and limitations in
+  `Extras/README.md`.

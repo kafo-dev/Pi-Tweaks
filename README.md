@@ -1,8 +1,9 @@
 # Pi-Tweaks
 
-A [pi](https://github.com/badlogic/pi-mono) package with tweaks to pi skills.
-Currently a patched **browser-tools**, forked from
-[`badlogic/pi-skills`](https://github.com/badlogic/pi-skills).
+A [pi](https://github.com/badlogic/pi-mono) package with tweaks to pi: a
+patched **browser-tools**, forked from
+[`badlogic/pi-skills`](https://github.com/badlogic/pi-skills), and a
+`bwrap` **sandbox wrapper** for the `pi` CLI.
 
 ## Install
 
@@ -23,6 +24,7 @@ demand and is available as `/skill:browser-tools`.
 |------|------|
 | [`package.json`](package.json) | pi package manifest (`pi.skills`) + dependencies |
 | [`browser-tools/`](browser-tools/) | CDP browser-automation skill. **Read [`browser-tools/NOTICE.md`](browser-tools/NOTICE.md)** for attribution and licensing before using or redistributing. |
+| [`Extras/`](Extras/) | `bwrap` sandbox wrapper for the `pi` CLI. See its [README](Extras/README.md). |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to contribute — commit message style, etc. |
 | [`LICENSE`](LICENSE) | ISC — this repository's own files. |
 
