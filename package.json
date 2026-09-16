@@ -1,0 +1,26 @@
+{
+	"name": "pi-tweaks",
+	"version": "0.1.0",
+	"description": "Tweaks to pi skills — currently a patched browser-tools (Linux support + output discipline)",
+	"license": "(ISC AND MIT)",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/kafo-dev/Pi-Tweaks.git"
+	},
+	"keywords": [
+		"pi-package"
+	],
+	"pi": {
+		"skills": [
+			"./browser-tools"
+		]
+	},
+	"dependencies": {
+		"@mozilla/readability": "^0.6.0",
+		"cheerio": "^1.1.2",
+		"jsdom": "^27.0.1",
+		"puppeteer-core": "^23.11.1",
+		"turndown": "^7.2.2",
+		"turndown-plugin-gfm": "^1.0.2"
+	}
+}

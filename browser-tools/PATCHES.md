@@ -1,0 +1,76 @@
+# Patches applied to browser-tools
+
+Base: `badlogic/pi-skills` @ `90bb51c` (2026-06-06), path `browser-tools/`.
+Upstream files are otherwise untouched, so a diff against that commit stays
+reviewable:
+
+```bash
+git diff 90bb51c:browser-tools .   # from a clone of upstream
+```
+
+## Patch 1 — Linux support
+
+**File:** [`browser-start-linux.js`](browser-start-linux.js) (added)
+
+Upstream `browser-start.js` is macOS-only: it hardcodes
+`/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`,
+`~/Library/Application Support/Google/Chrome/`, and `killall 'Google Chrome'`.
+
+The added script:
+
+- auto-detects a Chromium/Chrome binary (override with `$CHROME_BIN`);
+- starts a **dedicated, persistent agent profile** at `~/.cache/browser-tools`,
+  never the user's live profile;
+- with `--profile`, seeds that profile via `rsync` from the real Chromium
+  profile (auto-detected; `$BROWSER_PROFILE` override), excluding
+  `SingletonLock`/`SingletonSocket`/`SingletonCookie` and session/tab files;
+- reuses an existing `:9222` if one is already serving CDP;
+- launches detached with `--remote-debugging-port=9222 --user-data-dir=<agent>
+  --no-first-run --no-default-browser-check`.
+
+## Patch 2 — Output / context discipline
+
+**File:** [`SKILL.md`](SKILL.md) (upstream, modified — MIT)
+
+Tool stdout lands directly in the model's context, and raw page/search output is
+large. The skill now documents, up front:
+
+- redirect tool output to a scratch file and query the file rather than print it;
+- return the smallest useful value from the page (never dump the DOM or
+  `document.body.innerText`);
+- treat screenshots as the most expensive output — DOM-first for page state;
+- chain filtering into a single shell call and suppress narration output;
+- prefer whatever standard filters are available (`rg`/`grep`, `jq`, `head`,
+  `wc`, ...), counting or slicing before printing.
+
+It also documents the `chrome-extension://` → `✗ No active tab found` gotcha.
+
+## Patch 3 — SKILL.md corrections
+
+**File:** [`SKILL.md`](SKILL.md) (upstream, modified — MIT)
+
+- Fixed the setup path: `cd {baseDir}/browser-tools` → `cd {baseDir}`.
+- Documented the Linux start script alongside the macOS one.
+- Added the Output Discipline section (Patch 2).
+
+The full diff is ~87 changed lines against upstream; regenerate it with the
+`git diff` command above.
+
+## Patch 4 — packaged as a pi package
+
+**Files:** root [`package.json`](../package.json) (added), root
+[`.gitignore`](../.gitignore) (added); removed `browser-tools/package.json` and
+`browser-tools/package-lock.json`; `SKILL.md` Setup updated.
+
+- Added a root package manifest with `"keywords": ["pi-package"]` and
+  `"pi": { "skills": ["./browser-tools"] }`, so `pi install
+  git:github.com/kafo-dev/Pi-Tweaks` works.
+- **Hoisted dependencies to the root** so `pi install` installs them
+  automatically (pi runs `npm install` at the package root, not in nested
+  directories).
+- **Dropped unused dependencies** from the upstream nested manifest: `puppeteer`
+  (pulls a bundled Chromium), `puppeteer-extra`, and
+  `puppeteer-extra-plugin-stealth`. No script imports them; the tools use
+  `puppeteer-core` against the system browser. Kept: `puppeteer-core`,
+  `@mozilla/readability`, `jsdom`, `turndown`, `turndown-plugin-gfm`, `cheerio`.
+- The package license is `(ISC AND MIT)` (root ISC + `browser-tools/` MIT).
