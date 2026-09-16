@@ -1,7 +1,7 @@
 {
 	"name": "pi-tweaks",
 	"version": "0.1.0",
-	"description": "Tweaks to pi skills — a patched browser-tools (Linux support + output discipline) and keyless Exa web search",
+	"description": "Tweaks to pi — a patched browser-tools (Linux support + output discipline), keyless Exa web search, and pi-notify for desktop and phone alerts",
 	"license": "(ISC AND MIT)",
 	"repository": {
 		"type": "git",
@@ -11,6 +11,9 @@
 		"pi-package"
 	],
 	"pi": {
+		"extensions": [
+			"./pi-notify/index.ts"
+		],
 		"skills": [
 			"./browser-tools",
 			"./web-tools"
