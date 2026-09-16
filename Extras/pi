@@ -16,6 +16,9 @@ cache_dir=${XDG_CACHE_HOME:-"$HOME/.cache"}
 npm_dir=${npm_config_cache:-"$HOME/.npm"}
 go_dir="$HOME/.local/share/go"
 
+# Global skills tree; writable so skills can be installed and updated.
+agents_dir="$HOME/.agents"
+
 if [ "${BWRAP:-1}" = "0" ]; then
 	echo "pi-wrapper: bwrap is not isolating the agent; pi runs with full permissions." >&2
 	sleep 1
@@ -38,7 +41,7 @@ case "$home_real" in
 	;;
 esac
 
-for d in "$agent_dir" "$cache_dir" "$npm_dir" "$go_dir"; do
+for d in "$agent_dir" "$cache_dir" "$npm_dir" "$go_dir" "$agents_dir"; do
 	mkdir -p "$d"
 done
 
@@ -56,4 +59,5 @@ exec "$bwrap" \
 	--bind "$cache_dir" "$cache_dir" \
 	--bind "$npm_dir" "$npm_dir" \
 	--bind "$go_dir" "$go_dir" \
+	--bind "$agents_dir" "$agents_dir" \
 	"$real_pi" "$@"

@@ -31,6 +31,7 @@ name on `PATH` does not cause recursion.
 | `$XDG_CACHE_HOME` (default `~/.cache`) | tool caches, browser profiles |
 | `$npm_config_cache` (default `~/.npm`) | npm cache |
 | `~/.local/share/go` | Go install tree |
+| `~/.agents` | global skills (`~/.agents/skills`) |
 
 Everything else is read-only. The wrapper refuses to start if `$PWD` is `$HOME`
 or an ancestor of it, since binding the project read-write would expose
