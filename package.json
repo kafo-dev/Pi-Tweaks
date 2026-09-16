@@ -13,7 +13,7 @@
 	"pi": {
 		"skills": [
 			"./browser-tools",
-			"./web-search"
+			"./web-tools"
 		]
 	},
 	"dependencies": {

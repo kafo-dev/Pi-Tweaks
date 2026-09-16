@@ -1,10 +1,10 @@
 ---
-name: web-search
+name: web-tools
 description: Free, keyless web search and page fetching through Exa's hosted MCP server — no API key, no account, no sign-in — plus `web-read`, a local, unmetered reader that turns a URL into LLM-friendly markdown. Use when you need real-time web search, current news/facts, or clean markdown from URLs, especially when no EXA_API_KEY is configured, when the user asks how to use Exa without a key, or when a search tool that costs credits should be avoided.
 license: ISC
 ---
 
-# web-search
+# web-tools
 
 [Exa](https://exa.ai) runs a hosted MCP server that serves a **keyless free
 tier**: no account, no sign-in, no API key. This skill wraps that tier with two

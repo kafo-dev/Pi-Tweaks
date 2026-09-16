@@ -17,7 +17,7 @@ pi install /path/to/Pi-Tweaks
 The `pi` manifest in [`package.json`](package.json) declares the skills; pi
 installs the dependencies and discovers each skill's `SKILL.md`. The skills
 then load on demand and are available as `/skill:browser-tools` and
-`/skill:web-search`.
+`/skill:web-tools`.
 
 ## Contents
 
@@ -25,14 +25,14 @@ then load on demand and are available as `/skill:browser-tools` and
 |------|------|
 | [`package.json`](package.json) | pi package manifest (`pi.skills`) + dependencies |
 | [`browser-tools/`](browser-tools/) | CDP browser-automation skill. **Read [`browser-tools/NOTICE.md`](browser-tools/NOTICE.md)** for attribution and licensing before using or redistributing. |
-| [`web-search/`](web-search/) | Free, keyless web search through Exa's hosted MCP server, plus `web-read`, a local POSIX `sh` reader that turns a URL into LLM-friendly markdown. No API key. See its [README](web-search/README.md). |
+| [`web-tools/`](web-tools/) | Free, keyless web search through Exa's hosted MCP server, plus `web-read`, a local POSIX `sh` reader that turns a URL into LLM-friendly markdown. No API key. See its [README](web-tools/README.md). |
 | [`Extras/`](Extras/) | `bwrap` sandbox wrapper for the `pi` CLI. See its [README](Extras/README.md). |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to contribute — commit message style, etc. |
 | [`LICENSE`](LICENSE) | ISC — this repository's own files. |
 
 Subproject setup, usage, patches, and licensing live in each skill's directory
 — see [`browser-tools/README.md`](browser-tools/README.md) and
-[`web-search/README.md`](web-search/README.md).
+[`web-tools/README.md`](web-tools/README.md).
 
 ## Contributing
 
@@ -43,7 +43,7 @@ examples.
 ## License
 
 - Repository files outside `browser-tools/`: ISC — see [`LICENSE`](LICENSE).
-  This includes everything in `web-search/`.
+  This includes everything in `web-tools/`.
 - `browser-tools/`: MIT, overriding the root ISC for that directory. See
   [`browser-tools/LICENSE`](browser-tools/LICENSE) and
   [`browser-tools/NOTICE.md`](browser-tools/NOTICE.md).

@@ -1,4 +1,4 @@
-# web-search
+# web-tools
 
 Free, keyless web search and page fetching through [Exa](https://exa.ai)'s
 hosted MCP server — no API key, no account, no sign-in.
