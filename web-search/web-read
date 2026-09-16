@@ -1,0 +1,614 @@
+#!/usr/bin/env sh
+# SPDX-License-Identifier: ISC
+#
+# web-read — read a web page as LLM-friendly markdown.
+#
+# Strategy, in order:
+#   1. GET the URL with `Accept: text/markdown` so sites that support
+#      content negotiation ("Markdown for Agents", Mintlify, ...) answer with
+#      markdown instead of HTML.
+#   2. If HTML comes back, look for a markdown alternate:
+#        - <link rel="alternate" type="text/markdown" href="...">
+#        - the same URL with `.md` appended, or its extension replaced by `.md`
+#          (the convention from https://llmstxt.org/)
+#        - an `llms.txt` (walking up from the page to the site root) with an
+#          entry that links to the page's markdown
+#   3. Otherwise clean the HTML: drop script/style/nav/header/footer/aside/
+#      form/svg/comments, convert to markdown, and squeeze blank lines.
+#
+# Content goes to stdout; provenance goes to stderr (prefix `↳`), so it never
+# pollutes the model's context by accident.
+#
+# Requires a POSIX sh and curl. `awk` cleans HTML; `html2text`, `lynx`, `w3m`,
+# or `pandoc` converts it (a crude tag-strip is the last resort); `jq` is only
+# needed for --json.
+#
+# Portable POSIX sh (dash, ash, bash, ksh): no arrays, no `[[ ]]`, no `local`.
+# Constants are uppercase; variables set by a helper are lowercase and short.
+# Every helper that sets one is called through `$(...)` or as a plain command
+# in the main shell, never concurrently, so sharing them is safe.
+#
+# `shellcheck -s sh` is clean. `--enable=all` stays usable by declining four
+# optional checks:
+#   SC2249  "add a default *) case" — the unmatched branch is the intended,
+#           silent no-op in every one of these cases.
+#   SC2250  "braces around variable references" — style churn only.
+#   SC2310  "set -e is disabled in this condition" — intended: the probes are
+#           expected to fail and are handled inline.
+#   SC2312  "command substitution masks a pipeline status" — unavoidable for
+#           `printf | sed`/`awk` in POSIX sh, which has no pipefail; every such
+#           pipeline ends in the command whose status actually matters.
+# shellcheck disable=SC2249,SC2250,SC2310,SC2312
+
+set -eu
+
+PROG=web-read
+TIMEOUT=${WEBREAD_TIMEOUT:-60}
+UA=${WEBREAD_UA:-web-read/1.0 (+https://github.com/kafo-dev/Pi-Tweaks)}
+ACCEPT_MD='text/markdown, text/plain;q=0.9, text/html;q=0.8, */*;q=0.1'
+ACCEPT_HTML='text/html, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8'
+
+die() { printf '✗ %s\n' "$*" >&2; exit 1; }
+note() {
+	if [ "$QUIET" != 1 ]; then printf '↳ %s\n' "$*" >&2; fi
+	return 0
+}
+
+usage() {
+	cat <<EOF
+$PROG — fetch a URL as LLM-friendly markdown.
+
+Usage:
+  $PROG [options] <url>
+
+Options:
+  -o, --out FILE      write the content to FILE instead of stdout
+      --save          write to a new temp file and print its path (agent-friendly)
+  -c, --max-chars N   truncate the content to N characters
+  -r, --raw           skip discovery; print the response body untouched
+      --html          skip markdown discovery; fetch and clean HTML
+      --no-clean     keep boilerplate instead of stripping nav/header/footer
+      --full          prefer llms-full.txt over llms.txt for section roots
+  -j, --json          wrap the result in JSON (url, source, content_type, content)
+  -q, --quiet         suppress the provenance notes on stderr
+  -t, --timeout SEC   request timeout (default \$WEBREAD_TIMEOUT or 60)
+  -h, --help          show this help
+
+Environment:
+  WEBREAD_TIMEOUT     default curl timeout in seconds
+  WEBREAD_UA          User-Agent header
+
+Sources are tried in this order: content negotiation, an HTML
+rel="alternate" type="text/markdown" link, the URL with .md appended or its
+extension replaced, an llms.txt entry, then cleaned HTML.
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------------------------
+
+OUT=
+SAVE=0
+MAXCHARS=
+QUIET=0
+RAW=0
+FORCE_HTML=0
+NO_CLEAN=0
+FULL=0
+JSON=0
+
+while [ $# -gt 0 ]; do
+	case $1 in
+	-o | --out)
+		[ $# -ge 2 ] || die "$1 needs a value"
+		OUT=$2
+		shift 2
+		;;
+	--save)
+		SAVE=1
+		shift
+		;;
+	-c | --max-chars)
+		[ $# -ge 2 ] || die "$1 needs a value"
+		case $2 in
+		'' | *[!0-9]*) die "$1 needs a number, got: $2" ;;
+		*) MAXCHARS=$2 ;;
+		esac
+		shift 2
+		;;
+	-t | --timeout)
+		[ $# -ge 2 ] || die "$1 needs a value"
+		case $2 in
+		'' | *[!0-9]*) die "$1 needs a number, got: $2" ;;
+		*) TIMEOUT=$2 ;;
+		esac
+		shift 2
+		;;
+	-r | --raw) RAW=1; shift ;;
+	--html) FORCE_HTML=1; shift ;;
+	--no-clean) NO_CLEAN=1; shift ;;
+	--full) FULL=1; shift ;;
+	-j | --json) JSON=1; shift ;;
+	-q | --quiet) QUIET=1; shift ;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	--)
+		shift
+		break
+		;;
+	-*) die "unknown option: $1 (try --help)" ;;
+	*) break ;;
+	esac
+done
+
+[ $# -ge 1 ] || die "usage: $PROG [options] <url>"
+[ "$JSON" = 1 ] && [ $# -gt 1 ] && die "--json accepts a single URL"
+[ "$SAVE" = 1 ] && [ -n "$OUT" ] && die "--save and --out are mutually exclusive"
+[ "$SAVE" = 1 ] && [ "$JSON" = 1 ] && die "--save and --json are mutually exclusive"
+
+command -v curl >/dev/null 2>&1 || die "missing dependency: curl"
+command -v awk >/dev/null 2>&1 || die "missing dependency: awk"
+
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/web-read.XXXXXX") ||
+	die "could not create a temp directory"
+trap 'rm -rf "$TMP"' EXIT INT TERM
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+# HTML boilerplate remover: drops comments and the contents of elements that
+# are never part of the article (script, style, nav, header, footer, ...).
+# Line-oriented, so a tag may be split across lines and nested same-name
+# elements are handled with a simple count-free "skip until close" state.
+cat >"$TMP/clean.awk" <<'AWK'
+BEGIN {
+	kill["script"] = kill["style"] = kill["noscript"] = kill["template"] = 1
+	kill["nav"] = kill["header"] = kill["footer"] = kill["aside"] = 1
+	kill["form"] = kill["svg"] = kill["iframe"] = kill["canvas"] = 1
+	kill["dialog"] = kill["button"] = kill["object"] = kill["embed"] = 1
+	skip = ""
+	incomment = 0
+}
+function lower(s) { return tolower(s) }
+{
+	line = $0
+	out = ""
+	while (1) {
+		if (incomment) {
+			i = index(line, "-->")
+			if (i == 0) { line = ""; break }
+			line = substr(line, i + 3)
+			incomment = 0
+			continue
+		}
+		if (skip != "") {
+			low = lower(line)
+			pat = "</[ \t]*" skip
+			i = match(low, pat)
+			if (i == 0) { line = ""; break }
+			rest = substr(line, i)
+			j = index(rest, ">")
+			line = (j == 0) ? "" : substr(line, i + j)
+			skip = ""
+			continue
+		}
+		ci = index(line, "<!--")
+		ti = match(line, /<[^>]*>/)
+		if (ci > 0 && (ti == 0 || ci < ti)) {
+			out = out substr(line, 1, ci - 1)
+			line = substr(line, ci + 4)
+			incomment = 1
+			continue
+		}
+		if (ti == 0) {
+			out = out line
+			line = ""
+			break
+		}
+		tag = substr(line, RSTART, RLENGTH)
+		out = out substr(line, 1, RSTART - 1)
+		line = substr(line, RSTART + RLENGTH)
+		ltag = lower(tag)
+		name = ltag
+		sub(/^<\/?[ \t]*/, "", name)
+		sub(/[ \t>\/].*$/, "", name)
+		if (name in kill) {
+			if (ltag !~ /^<\// && ltag !~ /\/>[ \t]*$/) skip = name
+			continue
+		}
+		if (name == "!doctype" || name == "?xml") continue
+		out = out tag
+	}
+	if (out ~ /[^ \t\r]/) print out
+}
+AWK
+
+# GET a URL. Sets _code (HTTP status, 000 on transport error), _ctype (media
+# type without parameters), _final (effective URL). Returns non-zero only when
+# curl itself fails, not on 4xx/5xx.
+http_get() {
+	if ! curl -sSL --max-time "$TIMEOUT" -A "$UA" -H "Accept: $2" \
+		-D "$3.hdr" -o "$3" \
+		-w '%{http_code}\n%{content_type}\n%{url_effective}\n' "$1" \
+		>"$3.w" 2>"$TMP/curl.err"; then
+		_code=000
+		_ctype=
+		_final=$1
+		return 1
+	fi
+	_code=$(sed -n '1p' "$3.w")
+	_ctype=$(sed -n '2p' "$3.w")
+	_final=$(sed -n '3p' "$3.w")
+	case $_ctype in *\;*) _ctype=${_ctype%%;*} ;; esac
+	return 0
+}
+
+# Does this media type / body look like HTML?
+is_html() {
+	case $1 in *html*) return 0 ;; esac
+	head -c 2048 "$2" 2>/dev/null | tr '[:upper:]' '[:lower:]' |
+		grep -q -e '<!doctype html' -e '<html'
+}
+
+# Path (no query/fragment) of an absolute URL.
+url_path() {
+	_r=${1#*://}
+	case $_r in *\?*) _r=${_r%%\?*} ;; esac
+	case $_r in *\#*) _r=${_r%%\#*} ;; esac
+	case $_r in
+	*/*) printf '/%s\n' "${_r#*/}" ;;
+	*) printf '/\n' ;;
+	esac
+}
+
+# Normalize a path for comparison: strip query/fragment and a markdown/HTML
+# extension, collapse a trailing /index, and drop the trailing slash.
+norm_path() {
+	_p=$(printf '%s' "$1" | sed 's|/\./|/|g')
+	_p=${_p%%\#*}
+	_p=${_p%%\?*}
+	# Strip content-extension suffixes, repeatedly: foo.html.md.txt -> foo.
+	suffix=1
+	while [ "$suffix" = 1 ]; do
+		suffix=0
+		case $_p in
+		*.md)
+			_p=${_p%.md}
+			suffix=1
+			;;
+		*.markdown)
+			_p=${_p%.markdown}
+			suffix=1
+			;;
+		*.html)
+			_p=${_p%.html}
+			suffix=1
+			;;
+		*.htm)
+			_p=${_p%.htm}
+			suffix=1
+			;;
+		*.txt)
+			_p=${_p%.txt}
+			suffix=1
+			;;
+		esac
+	done
+	case $_p in */index) _p=${_p%/index} ;; esac
+	[ -n "$_p" ] || _p=/
+	case $_p in /) ;; *) _p=${_p%/} ;; esac
+	printf '%s' "$_p"
+}
+
+split_url() {
+	_rest=${1#*://}
+	case $_rest in *\#*) _rest=${_rest%%#*} ;; esac
+	case $_rest in
+	*\?*)
+		_query="?${_rest#*\?}"
+		_rest=${_rest%%\?*}
+		;;
+	*) _query= ;;
+	esac
+	_auth=${_rest%%/*}
+	case $_rest in
+	*/*) _path=/${_rest#*/} ;;
+	*) _path=/ ;;
+	esac
+	_origin=${1%%://*}://$_auth
+}
+
+# Directory of a path, with a trailing slash.
+dir_of() {
+	case $1 in
+	*/) printf '%s\n' "$1" ;;
+	*) printf '%s/\n' "${1%/*}" ;;
+	esac
+}
+
+# Directories from the page's own directory up to the site root.
+list_dirs() {
+	d=$(dir_of "$1")
+	while :; do
+		printf '%s\n' "$d"
+		[ "$d" = / ] && break
+		d=${d%/}
+		d=${d%/*}/
+		[ -n "$d" ] || d=/
+	done
+}
+
+# href of <link rel="alternate" type="text/markdown" ...>, if any.
+alt_markdown_url() {
+	awk '
+	{
+		s = $0
+		while (match(s, /<link[^>]*>/)) {
+			tag = substr(s, RSTART, RLENGTH)
+			s = substr(s, RSTART + RLENGTH)
+			lt = tolower(tag)
+			if (lt !~ /rel[ \t]*=[ \t]*["\047]?alternate/ ||
+			    lt !~ /type[ \t]*=[ \t]*["\047]?text\/markdown/) continue
+			if (match(tag, /href[ \t]*=[ \t]*("[^"]*"|\047[^\047]*\047|[^ \t>]+)/)) {
+				h = substr(tag, RSTART, RLENGTH)
+				sub(/^href[ \t]*=[ \t]*/, "", h)
+				gsub(/["\047]/, "", h)
+				if (h != "") { print h; exit }
+			}
+		}
+	}' "$1"
+}
+
+# From an llms.txt body ($1), find the link whose path matches $4. $2 is the
+# origin and $3 the base the file lives at (both ending in `/`). Prints the
+# resolved URL, or nothing.
+match_llms() {
+	_req=$(norm_path "$4")
+	awk '
+	{
+		s = $0
+		while (match(s, /\]\([^)]*\)/)) {
+			print substr(s, RSTART + 2, RLENGTH - 3)
+			s = substr(s, RSTART + RLENGTH)
+		}
+	}' "$1" | while IFS= read -r href; do
+		href=${href%% *}
+		[ -n "$href" ] || continue
+		case $href in
+		http://* | https://*) u=$href ;;
+		/*) u=$2$href ;;
+		*) u=$3$href ;;
+		esac
+		p=$(norm_path "$(url_path "$u")")
+		if [ "$p" = "$_req" ]; then
+			printf '%s\n' "$u"
+			break
+		fi
+	done
+}
+
+# Fetch $1 as markdown-ish content into $TMP/doc. $2 is the source label.
+probe_md() {
+	http_get "$1" "$ACCEPT_MD" "$TMP/probe" || return 1
+	[ "$_code" = 200 ] || return 1
+	[ -s "$TMP/probe" ] || return 1
+	is_html "$_ctype" "$TMP/probe" && return 1
+	cp "$TMP/probe" "$TMP/doc"
+	SRC=$2
+	CT_FINAL=$_ctype
+	FINAL=$_final
+	return 0
+}
+
+# Convert the HTML at $1 to text/markdown at $2 using the best tool available.
+render_html() {
+	if [ "$NO_CLEAN" = 1 ]; then
+		cp "$1" "$TMP/clean.html"
+		CONV=raw-html
+	else
+		awk -f "$TMP/clean.awk" "$1" >"$TMP/clean.html"
+		CONV=
+	fi
+	if command -v html2text >/dev/null 2>&1; then
+		html2text -b 0 --ignore-images "$TMP/clean.html" >"$2" 2>/dev/null
+		CONV=${CONV:+$CONV+}html2text
+	elif command -v lynx >/dev/null 2>&1; then
+		lynx -dump -nolist -width=1000 "$TMP/clean.html" >"$2" 2>/dev/null
+		CONV=${CONV:+$CONV+}lynx
+	elif command -v w3m >/dev/null 2>&1; then
+		w3m -dump -cols 1000 "$TMP/clean.html" >"$2" 2>/dev/null
+		CONV=${CONV:+$CONV+}w3m
+	elif command -v pandoc >/dev/null 2>&1; then
+		pandoc -f html -t gfm-raw_html "$TMP/clean.html" >"$2" 2>/dev/null
+		CONV=${CONV:+$CONV+}pandoc
+	else
+		sed -e 's/<[^>]*>/ /g' \
+			-e 's/&nbsp;/ /g' -e 's/&amp;/\&/g' -e 's/&lt;/</g' \
+			-e 's/&gt;/>/g' -e 's/&quot;/"/g' "$TMP/clean.html" >"$2"
+		CONV=${CONV:+$CONV+}sed
+	fi
+	# Collapse runs of blank lines and trailing whitespace.
+	awk '
+		{ sub(/[ \t\r]+$/, "") }
+		/^$/ { blank++; if (blank <= 1) print ""; next }
+		{ blank = 0; print }
+	' "$2" >"$2.sq" && mv "$2.sq" "$2"
+}
+
+# Print at most $1 characters (newlines included) of file $2.
+truncate_chars() {
+	awk -v n="$1" '
+		BEGIN { left = n }
+		{
+			if (left <= 0) exit
+			len = length($0) + 1
+			if (len <= left) { print; left -= len }
+			else { print substr($0, 1, left); exit }
+		}' "$2"
+}
+
+# ---------------------------------------------------------------------------
+# The pipeline for one URL
+# ---------------------------------------------------------------------------
+
+process() {
+	url=$1
+	case $url in
+	*://*) ;;
+	*) url="https://$url" ;;
+	esac
+
+	if [ "$RAW" = 1 ]; then
+		http_get "$url" "$ACCEPT_HTML" "$TMP/doc" || die "request failed: $url"
+		[ "$_code" = 000 ] && die "request failed: $url"
+		SRC="raw body · no discovery"
+		CT_FINAL=$_ctype
+		FINAL=$_final
+		return 0
+	fi
+
+	http_get "$url" "$ACCEPT_MD" "$TMP/body" || die "request failed: $url"
+	code=$_code
+	ctype=$_ctype
+	CT_FINAL=$ctype
+	FINAL=$_final
+
+	case $code in
+	2[0-9][0-9]) ;;
+	*) die "HTTP $code for $url" ;;
+	esac
+
+	if [ "$FORCE_HTML" = 0 ] && ! is_html "$ctype" "$TMP/body"; then
+		cp "$TMP/body" "$TMP/doc"
+		SRC="markdown · content negotiation"
+		CT_FINAL=$ctype
+		return 0
+	fi
+
+	if [ "$FORCE_HTML" = 0 ]; then
+		split_url "$FINAL"
+		origin=$_origin
+		path=$_path
+
+		# 1. <link rel="alternate" type="text/markdown">
+		alt=$(alt_markdown_url "$TMP/body")
+		if [ -n "$alt" ]; then
+			case $alt in
+			http://* | https://*) cand=$alt ;;
+			/*) cand=$origin$alt ;;
+			*) cand=$origin$(dir_of "$path")$alt ;;
+			esac
+			if probe_md "$cand" "markdown · rel=alternate: $alt"; then return 0; fi
+		fi
+
+		# 2. The URL with .md appended, or its extension replaced by .md.
+		: >"$TMP/cands"
+		add() {
+			grep -qxF -- "$1" "$TMP/cands" 2>/dev/null ||
+				printf '%s\n' "$1" >>"$TMP/cands"
+		}
+		base=$origin$path
+		case $path in
+		*/)
+			add "${base}index.md"
+			add "${base}index.html.md"
+			;;
+		*)
+			file=${path##*/}
+			dir=${path%/*}
+			case $file in
+			*.*) add "$origin$dir/${file%.*}.md" ;;
+			esac
+			add "$base.md"
+			;;
+		esac
+		while IFS= read -r cand; do
+			[ -n "$cand" ] || continue
+			if probe_md "$cand" "markdown · .md variant: $cand"; then return 0; fi
+		done <"$TMP/cands"
+
+		# 3. llms.txt, from the page's directory up to the site root.
+		if [ "$FULL" = 1 ]; then
+			names="llms-full.txt llms.txt"
+		else
+			names="llms.txt"
+		fi
+		list_dirs "$path" >"$TMP/dirs"
+		while IFS= read -r d; do
+			for name in $names; do
+				cand=$origin$d$name
+				if http_get "$cand" "$ACCEPT_MD" "$TMP/llms" &&
+					[ "$_code" = 200 ] && [ -s "$TMP/llms" ] &&
+					! is_html "$_ctype" "$TMP/llms"; then
+					if [ "$(norm_path "$path")" = "$(norm_path "$d")" ]; then
+						cp "$TMP/llms" "$TMP/doc"
+						SRC="markdown · $name"
+						CT_FINAL=$_ctype
+						FINAL=$_final
+						return 0
+					fi
+					if [ "$name" = llms.txt ]; then
+						hit=$(match_llms "$TMP/llms" "$origin" "$origin$d" "$path")
+						if [ -n "$hit" ] && probe_md "$hit" "markdown · llms.txt entry: $hit"; then
+							return 0
+						fi
+					fi
+				fi
+			done
+		done <"$TMP/dirs"
+	fi
+
+	# 4. Clean the HTML we already have.
+	render_html "$TMP/body" "$TMP/doc"
+	if [ "$NO_CLEAN" = 1 ]; then
+		SRC="html · no cleaning"
+	else
+		SRC="html · cleaned with $CONV"
+	fi
+	CT_FINAL=$ctype
+	return 0
+}
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+: >"$TMP/out"
+count=$#
+for u in "$@"; do
+	if [ "$count" -gt 1 ]; then printf '# %s\n\n' "$u" >>"$TMP/out"; fi
+	process "$u"
+	if [ -n "$MAXCHARS" ] && [ "$(wc -m <"$TMP/doc" | tr -d ' ')" -gt "$MAXCHARS" ]; then
+		truncate_chars "$MAXCHARS" "$TMP/doc" >>"$TMP/out"
+		SRC="$SRC · truncated to $MAXCHARS chars"
+	else
+		cat "$TMP/doc" >>"$TMP/out"
+	fi
+	printf '\n' >>"$TMP/out"
+	note "$u — $SRC"
+done
+
+if [ "$JSON" = 1 ]; then
+	command -v jq >/dev/null 2>&1 || die "missing dependency: jq (needed for --json)"
+	jq -Rs \
+		--arg url "$1" \
+		--arg final_url "$FINAL" \
+		--arg source "$SRC" \
+		--arg content_type "$CT_FINAL" \
+		'{url: $url, final_url: $final_url, source: $source,
+		  content_type: $content_type, content: .}' "$TMP/out"
+elif [ "$SAVE" = 1 ]; then
+	save=$(mktemp "${TMPDIR:-/tmp}/web-read.XXXXXX.md") ||
+		die "could not create a temp file"
+	cat "$TMP/out" >"$save"
+	printf '%s\n' "$save"
+elif [ -n "$OUT" ]; then
+	cat "$TMP/out" >"$OUT"
+	note "wrote $OUT"
+else
+	cat "$TMP/out"
+fi

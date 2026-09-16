@@ -1,18 +1,21 @@
 ---
 name: web-search
-description: Free, keyless web search and page fetching through Exa's hosted MCP server — no API key, no account, no sign-in. Use when you need real-time web search, current news/facts, or clean markdown from URLs, especially when no EXA_API_KEY is configured, when the user asks how to use Exa without a key, or when a search tool that costs credits should be avoided.
+description: Free, keyless web search and page fetching through Exa's hosted MCP server — no API key, no account, no sign-in — plus `web-read`, a local, unmetered reader that turns a URL into LLM-friendly markdown. Use when you need real-time web search, current news/facts, or clean markdown from URLs, especially when no EXA_API_KEY is configured, when the user asks how to use Exa without a key, or when a search tool that costs credits should be avoided.
 license: ISC
 ---
 
 # web-search
 
 [Exa](https://exa.ai) runs a hosted MCP server that serves a **keyless free
-tier**: no account, no sign-in, no API key. This skill wraps that tier with one
-POSIX `sh` script, `exa.sh`, plus the unauthenticated x402/MPP price probe on
-`api.exa.ai`.
+tier**: no account, no sign-in, no API key. This skill wraps that tier with two
+POSIX `sh` scripts: [`web-read`](web-read) reads a URL you already have as
+LLM-friendly markdown, and [`exa.sh`](exa.sh) searches and fetches through
+Exa's MCP server, plus the unauthenticated x402/MPP price probe on `api.exa.ai`.
 
-Everything here is free but rate-limited: **3 queries/second and 150 calls/day**
-per IP. Budget your calls; batch URLs into a single `fetch` call.
+Exa's keyless tier is free but rate-limited: **3 queries/second and 150
+calls/day** per IP. Budget those; batch URLs into a single `fetch` call.
+`web-read` talks to the target site directly, so it is neither metered nor
+limited by Exa.
 
 `{baseDir}` is this skill's directory.
 
@@ -35,6 +38,58 @@ Common options: `-n/--num N`, `-O/--objective "..."`, `-c/--max-chars N`,
 `--exclude-domains`, `--start-published`, `--end-published`, `--include-text`,
 `--exclude-text`, `--location`, `--max-age-hours`, `--highlights`,
 `--summaries [Q]`, `--subpages`. Run `exa.sh --help` for the full list.
+
+## Reading a known URL: `web-read`
+
+When you already have a URL, read it with `web-read` instead of a raw `curl`.
+It returns LLM-friendly markdown and reports on **stderr** which of three
+sources it used, so stdout stays clean for the model.
+
+```bash
+{baseDir}/web-read [options] <url>
+```
+
+Options must come **before** the URL: `[options] <url>`, not `<url>
+[options]`. `web-read --save <url>` works; `<url> --save` treats `--save` as a
+second URL and fails with `✗ request failed: …/--save`.
+
+1. **Content negotiation** — the site answers `Accept: text/markdown` with
+   markdown (Cloudflare, Anthropic, Mintlify, ...).
+2. **A markdown alternate** — a `<link rel="alternate" type="text/markdown">`,
+   the URL with `.md` appended or its extension replaced (the
+   [llms.txt](https://llmstxt.org/) convention), or an `llms.txt` entry that
+   links the page's markdown.
+3. **Cleaned HTML** — script/style/nav/header/footer/aside/form/svg/comments
+   are dropped, then `html2text` (or `lynx`, `w3m`, `pandoc`) converts the rest
+   to markdown.
+
+The provenance line names the branch and the URL it resolved to, e.g.
+`↳ … — markdown · content negotiation`,
+`↳ … — markdown · .md variant: https://…/index.md`,
+`↳ … — markdown · llms.txt entry: https://…/page.md.txt`, or
+`↳ … — html · cleaned with html2text`.
+
+Options: `--save` (write a temp file and print its path), `-o FILE` (write to
+a chosen file), `-c N` (cap at N characters), `--raw` (print the response body
+untouched), `--html` (skip discovery, clean HTML), `--no-clean` (keep
+boilerplate), `--full` (prefer `llms-full.txt`), `-j` (JSON envelope), `-q`
+(quiet), `-t SEC` (timeout).
+
+For anything longer than a screenful, don't let it land in context — save it
+and query the file:
+
+```bash
+f=$({baseDir}/web-read --save "$url")   # prints one path on stdout
+rg -n -i 'pattern' "$f"
+head -40 "$f"
+```
+
+The content stays in the temp file; only the path and the `↳ … — <strategy>`
+provenance line reach the model.
+
+Use it for **reading a page's content**. When you need the **raw** response —
+exact bytes, custom headers, a specific method, an authenticated API — use
+shell tools (`curl`, `jq`, ...) or `exa.sh fetch` directly instead.
 
 ## Output discipline
 
@@ -60,6 +115,8 @@ jq -r '.results[] | .url' "${TMPDIR:-/tmp}/a.json"
 
 ## Choosing a tool
 
+- **`web-read`** — you already have a URL and want the page's content. Local,
+  free, and unlimited; try it before `fetch`. One URL per call (loop for more).
 - **`search`** — default. Natural-language query, returns highlights and content
   for the top results. The query should describe the *ideal page*, not
   keywords, and pass `-O/--objective` when you need a specific fact ranked
@@ -68,9 +125,9 @@ jq -r '.results[] | .url' "${TMPDIR:-/tmp}/a.json"
   text filters, summaries, subpages. Returns JSON. Use it for news windows
   (`--start-published`), site-restricted search (`--include-domains`), or
   people/company lookups (`--category people|company`).
-- **`fetch`** — you already have URLs. Batch them in one call:
-  `exa.sh fetch url1 url2 url3 -c 5000 -o /tmp/pages.md`. Costs one call, not
-  three.
+- **`fetch`** — many URLs at once, or a page `web-read` could not get (JS-only
+  content). Batch them in one call: `exa.sh fetch url1 url2 url3 -c 5000 -o
+  /tmp/pages.md`. Costs one call, not three. Prefer `web-read` for single URLs.
 
 ## Authentication and limits
 
@@ -102,6 +159,8 @@ Unauthenticated discovery probes are limited to 5 per IP per minute.
 | `EXA_API_KEY` | *(unset)* | Optional; switches off the free tier |
 | `EXA_API_BASE` | `https://api.exa.ai` | REST base used by `pricing` |
 | `EXA_TIMEOUT` | `60` | Default curl timeout in seconds |
+| `WEBREAD_TIMEOUT` | `60` | `web-read` curl timeout in seconds |
+| `WEBREAD_UA` | `web-read/1.0 (+…)` | `web-read` User-Agent header |
 
 ## Gotchas
 
@@ -112,6 +171,12 @@ Unauthenticated discovery probes are limited to 5 per IP per minute.
   the query when `-O` is omitted.
 - Exhausted the daily budget? Calls fail with an MCP error, not a `429` you can
   retry through. Fall back to another source or wait for the window to reset.
-- Requires a POSIX shell (`sh`), `curl`, and `jq`. The script avoids bashisms
-  on purpose (`#!/usr/bin/env sh`, no arrays, no `[[ ]]`, no `local`, no
-  `pipefail`) so it runs under `dash`, `ash`, `bash`, and `ksh`.
+- `web-read` parses `[options] <url>`, so options go first. Putting a flag
+after the URL makes it a second URL and errors with `request failed:
+https://--save` (or whichever flag it was).
+- Requires a POSIX shell (`sh`) and `curl`. `exa.sh` also needs `jq`.
+  `web-read` cleans HTML with `awk` and converts it with the first of
+  `html2text`, `lynx`, `w3m`, or `pandoc` it finds (falling back to a crude
+  tag-strip), and only needs `jq` for `--json`. Both scripts avoid bashisms on
+  purpose (`#!/usr/bin/env sh`, no arrays, no `[[ ]]`, no `local`, no
+  `pipefail`) so they run under `dash`, `ash`, `bash`, and `ksh`.
