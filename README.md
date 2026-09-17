@@ -6,8 +6,9 @@ patched **browser-tools**, forked from
 **keyless Exa web search** skill with a local, unmetered `web-read` reader, a
 `bwrap` **sandbox wrapper** for the `pi` CLI, **pi-notify**, which alerts
 you on the desktop and on your phone when pi needs you, a **`python`** tool
-that runs Python 3 without shell quoting, and an **`/exit`** alias for pi's
-built-in `/quit`.
+that runs Python 3 without shell quoting and installs missing packages into a
+shared virtual environment, and an **`/exit`** alias for pi's built-in
+`/quit`.
 
 ## Install
 
@@ -32,7 +33,7 @@ configure it.
 | [`package.json`](package.json) | pi package manifest (`pi.extensions`, `pi.skills`) + dependencies |
 | [`pi-notify/`](pi-notify/) | Extension that notifies you — desktop and KDE Connect phone alarm — when pi settles a turn or blocks on a dialog. Terminal notifications on by default, phone off. See its [README](pi-notify/README.md). |
 | [`pi-exit.ts`](pi-exit.ts) | Extension that adds `/exit` as an alias for pi's built-in `/quit`. |
-| [`pi-python.ts`](pi-python.ts) | Extension that adds a `python` tool: raw Python 3 source is passed as one argv entry, so no shell quoting, escaping, or code fences are needed. |
+| [`pi-python.ts`](pi-python.ts) | Extension that adds a `python` tool: raw Python 3 source is passed as one argv entry, so no shell quoting, escaping, or code fences are needed. A `pip` field installs packages into a virtual environment shared by every pi session (`python-venv` inside pi's agent directory) before the code runs, and `retry_previous` re-runs the last program so the model can install a missing package without resending its code. |
 | [`pi-timestamps.ts`](pi-timestamps.ts) | Extension that appends a date and time stamp to each sent prompt and to the final answer of a turn, so the model can see when it last spoke and when you last wrote. Each stamp carries the gap since the previous one (`+1m30s`), and the counter resets at each session start. The stamp lives in the session and the model context but is hidden from the rendered transcript. Messages that stopped to call a tool are skipped. |
 | [`browser-tools/`](browser-tools/) | CDP browser-automation skill. **Read [`browser-tools/NOTICE.md`](browser-tools/NOTICE.md)** for attribution and licensing before using or redistributing. |
 | [`web-tools/`](web-tools/) | Free, keyless web search through Exa's hosted MCP server, plus `web-read`, a local POSIX `sh` reader that turns a URL into LLM-friendly markdown. No API key. See its [README](web-tools/README.md). |
