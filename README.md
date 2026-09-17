@@ -4,8 +4,9 @@ A [pi](https://github.com/badlogic/pi-mono) package with tweaks to pi: a
 patched **browser-tools**, forked from
 [`badlogic/pi-skills`](https://github.com/badlogic/pi-skills), a
 **keyless Exa web search** skill with a local, unmetered `web-read` reader, a
-`bwrap` **sandbox wrapper** for the `pi` CLI, and **pi-notify**, which alerts
-you on the desktop and on your phone when pi needs you.
+`bwrap` **sandbox wrapper** for the `pi` CLI, **pi-notify**, which alerts
+you on the desktop and on your phone when pi needs you, and an **`/exit`**
+alias for pi's built-in `/quit`.
 
 ## Install
 
@@ -17,10 +18,10 @@ pi install /path/to/Pi-Tweaks
 
 The `pi` manifest in [`package.json`](package.json) declares the resources; pi
 installs the dependencies and discovers each skill's `SKILL.md` and the
-`pi-notify` extension. The skills then load on demand and are available as
-`/skill:browser-tools` and `/skill:web-tools`; `pi-notify` is always loaded and
-notifies on the terminal out of the box, while its phone leg stays off until
-you configure it.
+`pi-notify` and `pi-exit` extensions. The skills then load on demand and are
+available as `/skill:browser-tools` and `/skill:web-tools`; `pi-notify` and
+`pi-exit` are always loaded. `pi-notify` notifies on the terminal out of the
+box, while its phone leg stays off until you configure it.
 
 ## Contents
 
@@ -28,6 +29,7 @@ you configure it.
 |------|------|
 | [`package.json`](package.json) | pi package manifest (`pi.extensions`, `pi.skills`) + dependencies |
 | [`pi-notify/`](pi-notify/) | Extension that notifies you — desktop and KDE Connect phone alarm — when pi settles a turn or blocks on a dialog. Terminal notifications on by default, phone off. See its [README](pi-notify/README.md). |
+| [`pi-exit.ts`](pi-exit.ts) | Extension that adds `/exit` as an alias for pi's built-in `/quit`. |
 | [`browser-tools/`](browser-tools/) | CDP browser-automation skill. **Read [`browser-tools/NOTICE.md`](browser-tools/NOTICE.md)** for attribution and licensing before using or redistributing. |
 | [`web-tools/`](web-tools/) | Free, keyless web search through Exa's hosted MCP server, plus `web-read`, a local POSIX `sh` reader that turns a URL into LLM-friendly markdown. No API key. See its [README](web-tools/README.md). |
 | [`Extras/`](Extras/) | `bwrap` sandbox wrapper for the `pi` CLI. See its [README](Extras/README.md). |

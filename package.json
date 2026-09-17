@@ -1,7 +1,7 @@
 {
 	"name": "pi-tweaks",
 	"version": "0.1.0",
-	"description": "Tweaks to pi — a patched browser-tools (Linux support + output discipline), keyless Exa web search, and pi-notify for desktop and phone alerts",
+	"description": "Tweaks to pi — a patched browser-tools (Linux support + output discipline), keyless Exa web search, pi-notify for desktop and phone alerts, and /exit as an alias for /quit",
 	"license": "(ISC AND MIT)",
 	"repository": {
 		"type": "git",
@@ -12,7 +12,8 @@
 	],
 	"pi": {
 		"extensions": [
-			"./pi-notify/index.ts"
+			"./pi-notify/index.ts",
+			"./pi-exit.ts"
 		],
 		"skills": [
 			"./browser-tools",
