@@ -49,6 +49,12 @@ see [`browser-tools/README.md`](browser-tools/README.md),
 [`web-tools/README.md`](web-tools/README.md), and
 [`pi-notify/README.md`](pi-notify/README.md).
 
+## AI usage
+
+This project is written with AI assistance. The extensions, the skills, and
+the `bwrap` wrapper, along with this README and the other documentation, were
+written and revised with an AI coding agent.
+
 ## Contributing
 
 This project uses **scoped commits** (`<scope>: <description>`), not
