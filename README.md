@@ -7,9 +7,10 @@ patched **browser-tools**, forked from
 `bwrap` **sandbox wrapper** for the `pi` CLI, **pi-notify**, which alerts
 you on the desktop and on your phone when pi needs you, a **`python`** tool
 that runs Python 3 without shell quoting and installs missing packages into a
-shared virtual environment, a **custom compaction prompt** for controlling what
-pi's summaries keep, a **date and time stamp** on each prompt and answer, and an
-**`/exit`** alias for pi's built-in `/quit`.
+shared virtual environment, **pinned skills** and a **custom compaction prompt**
+for controlling what reaches pi's system prompt and its summaries, a **date and
+time stamp** on each prompt and answer, and an **`/exit`** alias for pi's
+built-in `/quit`.
 
 ## Install
 
@@ -32,6 +33,7 @@ stays off until you configure it.
 |------|------|
 | [`package.json`](package.json) | pi package manifest (`pi.extensions`, `pi.skills`) + dependencies |
 | [`pi-notify/`](pi-notify/) | Extension that notifies you — desktop and KDE Connect phone alarm — when pi settles a turn or blocks on a dialog. Terminal notifications on by default, phone off. See its [README](pi-notify/README.md). |
+| [`pi-pinned-skills.ts`](pi-pinned-skills.ts) | Extension that appends the full text of skills named in `pinned-skills.json` to the system prompt on every turn, so they apply without the model deciding to read them. The block is deterministic, which keeps it inside the provider's cached prefix. `/pinned-skills` reports what resolved. |
 | [`pi-compaction-prompt.ts`](pi-compaction-prompt.ts) | Extension that replaces pi's compaction prompt with the body of a Markdown file named by `compaction.promptFile` in `settings.json`. The previous summary, `/compact` instructions, and the conversation are appended, and the read/modified file lists pi normally adds are kept. Unset means pi's default compaction. |
 | [`pi-exit.ts`](pi-exit.ts) | Extension that adds `/exit` as an alias for pi's built-in `/quit`. |
 | [`pi-python.ts`](pi-python.ts) | Extension that adds a `python` tool: raw Python 3 source is passed as one argv entry, so no shell quoting, escaping, or code fences are needed. A `pip` field installs packages into a virtual environment shared by every pi session (`python-venv` inside pi's agent directory) before the code runs, and `retry_previous` re-runs the last program so the model can install a missing package without resending its code. |
