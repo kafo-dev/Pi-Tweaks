@@ -6,6 +6,8 @@
 # the project directory plus a few state directories read-write, so a session
 # cannot write anywhere else under $HOME.
 
+notes_file="$HOME/Documents/AGENT-NOTES.md"
+
 real_pi=/usr/bin/pi
 bwrap=/usr/bin/bwrap
 
@@ -60,4 +62,5 @@ exec "$bwrap" \
     --bind "$npm_dir" "$npm_dir" \
     --bind "$go_dir" "$go_dir" \
     --bind "$agents_dir" "$agents_dir" \
+    --bind-try "$notes_file" "$notes_file" \
     "$real_pi" "$@"
