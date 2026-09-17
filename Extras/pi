@@ -20,9 +20,9 @@ go_dir="$HOME/.local/share/go"
 agents_dir="$HOME/.agents"
 
 if [ "${BWRAP:-1}" = "0" ]; then
-	echo "pi-wrapper: bwrap is not isolating the agent; pi runs with full permissions." >&2
-	sleep 1
-	exec "$real_pi" "$@"
+    echo "pi-wrapper: bwrap is not isolating the agent; pi runs with full permissions." >&2
+    sleep 1
+    exec "$real_pi" "$@"
 fi
 
 cwd=$(pwd -P)
@@ -31,33 +31,33 @@ home_real=$(cd "$HOME" && pwd -P)
 host=$(hostname | tr -c 'A-Za-z0-9.-' '-')
 
 if [ "$cwd" = "$home_real" ]; then
-	echo "pi-wrapper: refusing to sandbox from $cwd (would expose \$HOME read-write). cd into a project directory." >&2
-	exit 1
+    echo "pi-wrapper: refusing to sandbox from $cwd (would expose \$HOME read-write). cd into a project directory." >&2
+    exit 1
 fi
 case "$home_real" in
 "$cwd"/*)
-	echo "pi-wrapper: refusing to sandbox from $cwd (would expose \$HOME read-write). cd into a project directory." >&2
-	exit 1
-	;;
+    echo "pi-wrapper: refusing to sandbox from $cwd (would expose \$HOME read-write). cd into a project directory." >&2
+    exit 1
+    ;;
 esac
 
 for d in "$agent_dir" "$cache_dir" "$npm_dir" "$go_dir" "$agents_dir"; do
-	mkdir -p "$d"
+    mkdir -p "$d"
 done
 
 exec "$bwrap" \
-	--unshare-all \
-	--share-net \
-	--die-with-parent \
-	--hostname "$host-Pi-Isolated" \
-	--ro-bind / / \
-	--proc /proc \
-	--dev /dev \
-	--tmpfs /tmp \
-	--bind "$cwd" "$cwd" \
-	--bind "$agent_dir" "$agent_dir" \
-	--bind "$cache_dir" "$cache_dir" \
-	--bind "$npm_dir" "$npm_dir" \
-	--bind "$go_dir" "$go_dir" \
-	--bind "$agents_dir" "$agents_dir" \
-	"$real_pi" "$@"
+    --unshare-all \
+    --share-net \
+    --die-with-parent \
+    --hostname "$host-Pi-Isolated" \
+    --ro-bind / / \
+    --proc /proc \
+    --dev /dev \
+    --tmpfs /tmp \
+    --bind "$cwd" "$cwd" \
+    --bind "$agent_dir" "$agent_dir" \
+    --bind "$cache_dir" "$cache_dir" \
+    --bind "$npm_dir" "$npm_dir" \
+    --bind "$go_dir" "$go_dir" \
+    --bind "$agents_dir" "$agents_dir" \
+    "$real_pi" "$@"
