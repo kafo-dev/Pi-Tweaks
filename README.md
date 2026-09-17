@@ -33,6 +33,7 @@ configure it.
 | [`pi-notify/`](pi-notify/) | Extension that notifies you — desktop and KDE Connect phone alarm — when pi settles a turn or blocks on a dialog. Terminal notifications on by default, phone off. See its [README](pi-notify/README.md). |
 | [`pi-exit.ts`](pi-exit.ts) | Extension that adds `/exit` as an alias for pi's built-in `/quit`. |
 | [`pi-python.ts`](pi-python.ts) | Extension that adds a `python` tool: raw Python 3 source is passed as one argv entry, so no shell quoting, escaping, or code fences are needed. |
+| [`pi-timestamps.ts`](pi-timestamps.ts) | Extension that appends a date and time stamp to each sent prompt and to the final answer of a turn, so the model can see when it last spoke and when you last wrote. Each stamp carries the gap since the previous one (`+1m30s`), and the counter resets at each session start. The stamp lives in the session and the model context but is hidden from the rendered transcript. Messages that stopped to call a tool are skipped. |
 | [`browser-tools/`](browser-tools/) | CDP browser-automation skill. **Read [`browser-tools/NOTICE.md`](browser-tools/NOTICE.md)** for attribution and licensing before using or redistributing. |
 | [`web-tools/`](web-tools/) | Free, keyless web search through Exa's hosted MCP server, plus `web-read`, a local POSIX `sh` reader that turns a URL into LLM-friendly markdown. No API key. See its [README](web-tools/README.md). |
 | [`Extras/`](Extras/) | `bwrap` sandbox wrapper for the `pi` CLI. See its [README](Extras/README.md). |
