@@ -131,7 +131,22 @@ async function notifyUser(ctx: ExtensionContext, body: string) {
 }
 
 export default function (pi: ExtensionAPI) {
-	pi.on("agent_settled", (_event, ctx) => notifyUser(ctx, "Ready for input"));
+	// `/stop` aborts the turn on purpose, so the settle that follows is not news.
+	// pi-stop announces the abort; skip that one alert.
+	let turnAborted = false;
+	pi.events.on("turn-aborted", () => {
+		turnAborted = true;
+	});
+	pi.on("agent_start", () => {
+		turnAborted = false;
+	});
+	pi.on("agent_settled", (_event, ctx) => {
+		if (turnAborted) {
+			turnAborted = false;
+			return;
+		}
+		notifyUser(ctx, "Ready for input");
+	});
 	pi.on("ui_prompt_start", (event, ctx) =>
 		notifyUser(ctx, `Needs input: ${event.title ?? event.kind}`),
 	);
