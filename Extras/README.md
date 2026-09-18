@@ -29,28 +29,49 @@ name on `PATH` does not cause recursion.
 | `$PWD` | the project |
 | `$PI_CODING_AGENT_DIR` (default `~/.pi/agent`) | settings, sessions, trust, packages, auth |
 | `$XDG_CACHE_HOME` (default `~/.cache`) | tool caches, browser profiles |
-| `$npm_config_cache` (default `~/.npm`) | npm cache |
-| `~/.local/share/go` | Go install tree |
 | `~/.agents` | global skills (`~/.agents/skills`) |
 | `~/Documents/AGENT-NOTES.md` | cross-project agent scratch notes, if the file exists (`--bind-try`) |
 
-Everything else is read-only. The wrapper refuses to start if `$PWD` is `$HOME`
-or an ancestor of it, since binding the project read-write would expose
-`$HOME`.
+Everything else is read-only. Language and package-manager directories are
+deliberately not bound: add the ones a session needs to the `rw-paths.txt` file
+(see below). The wrapper refuses to start if `$PWD` is `$HOME` or an ancestor
+of it, since binding the project read-write would expose `$HOME`.
 
 The agent directory is shared read-write with the host, so auth, sessions, and
 installed packages carry over between sandboxed and unsandboxed runs. That also
 means provider credentials are visible inside the sandbox; treat untrusted
 projects accordingly.
 
+### Extra read-write paths
+
+List additional host paths to bind read-write, one per line, in a file next to
+the agent directory. With the default agent directory that is
+`~/.pi/rw-paths.txt`; overriding `PI_CODING_AGENT_DIR` moves the file to its
+parent directory:
+
+```
+# comments and blank lines are ignored
+~/Documents
+/home/user/shared
+```
+
+`~` expands to `$HOME`. Each entry is mounted with `--bind-try`, so a path that
+does not exist is skipped and the wrapper still starts. An entry is taken
+literally: do not quote it, even when the path contains spaces. Non-absolute
+entries are ignored with a warning. The wrapper reads the file on the host
+before entering the sandbox, so the file itself does not need to be reachable
+inside it. Every listed path becomes writable by the agent, so list only
+directories the agent may modify; listing `/` or `$HOME` defeats the sandbox.
+By default the file itself is outside the writable set, so the agent cannot
+widen its own mounts.
+
 ### Environment variables
 
 | Variable | Purpose |
 |----------|---------|
 | `BWRAP` | Set to `0` to skip the sandbox. The wrapper then warns and runs `pi` unsandboxed with the same arguments. |
-| `PI_CODING_AGENT_DIR` | Override the agent directory that is bound read-write. Default `~/.pi/agent`. |
+| `PI_CODING_AGENT_DIR` | Override the agent directory that is bound read-write. Default `~/.pi/agent`. Also relocates `rw-paths.txt` to its parent. |
 | `XDG_CACHE_HOME` | Override the cache directory that is bound read-write. Default `~/.cache`. |
-| `npm_config_cache` | Override the npm cache that is bound read-write. Default `~/.npm`. |
 
 ### Notes and limitations
 
