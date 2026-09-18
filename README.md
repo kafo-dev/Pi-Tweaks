@@ -1,17 +1,7 @@
 # Pi-Tweaks
 
-A [pi](https://github.com/badlogic/pi-mono) package with tweaks to pi: a
-patched **browser-tools**, forked from
-[`badlogic/pi-skills`](https://github.com/badlogic/pi-skills), a
-**keyless Exa web search** skill with a local, unmetered `web-read` reader, a
-`bwrap` **sandbox wrapper** for the `pi` CLI, **pi-notify**, which alerts
-you on the desktop and on your phone when pi needs you, a **`python`** tool
-that runs Python 3 without shell quoting and installs missing packages into a
-shared virtual environment, **pinned skills** and a **custom compaction prompt**
-for controlling what reaches pi's system prompt and its summaries, a **date and
-time stamp** on each prompt and answer, an **`/exit`** alias for pi's
-built-in `/quit`, and a **`/stop`** command that aborts the running turn. It
-also gives the **`bash`** tool a default `timeout`, which pi ships without.
+Miscellaneous tools for the [pi](https://github.com/earendil-works/pi) coding
+agent harness: skills, extensions, and a `bwrap` sandbox wrapper.
 
 ## Install
 
