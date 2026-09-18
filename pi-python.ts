@@ -34,6 +34,8 @@ import {
 import { Type } from "typebox";
 
 const DEFAULT_KEEP_LINES = 50; // lines kept from each end of truncated output
+const DEFAULT_TIMEOUT_SECONDS = 10; // code run is killed after this long
+const MAX_TIMEOUT_SECONDS = 2147483647 / 1000; // 32-bit setTimeout ceiling
 const VENV_DIRECTORY_NAME = "python-venv"; // venv lives under pi's agent dir
 const VENV_PYTHON_PATH = join("bin", "python3"); // interpreter inside the venv
 
@@ -69,6 +71,22 @@ function combinedOutput(result: { stdout: string; stderr: string }): string {
 		.filter((stream) => stream.trim())
 		.join("\n")
 		.trim();
+}
+
+function resolveTimeoutSeconds(timeout: number | undefined): number {
+	if (timeout === undefined) {
+		return DEFAULT_TIMEOUT_SECONDS;
+	}
+	if (!Number.isFinite(timeout)) {
+		throw new Error("python: timeout must be a finite number of seconds");
+	}
+	if (timeout <= 0) {
+		throw new Error("python: timeout must be greater than zero");
+	}
+	if (timeout > MAX_TIMEOUT_SECONDS) {
+		throw new Error(`python: timeout must be at most ${MAX_TIMEOUT_SECONDS} seconds`);
+	}
+	return timeout;
 }
 
 function resolveWorkingDirectory(
@@ -121,6 +139,9 @@ async function ensureVenv(
 		["-m", "venv", "--system-site-packages", venvDirectory],
 		{ signal },
 	);
+	if (result.killed) {
+		throw new Error("python: venv creation aborted");
+	}
 	if (result.code !== 0) {
 		const output = truncateOutput(combinedOutput(result), DEFAULT_KEEP_LINES);
 		throw new Error(`python: failed to create venv\n${output}`);
@@ -138,6 +159,9 @@ async function installPackages(
 		["-m", "pip", "install", ...packages],
 		{ signal },
 	);
+	if (result.killed) {
+		throw new Error("python: pip install aborted");
+	}
 	if (result.code === 0) {
 		return `Installed pip packages: ${packages.join(", ")}`;
 	}
@@ -166,7 +190,10 @@ export default function (pi: ExtensionAPI) {
 			"packages and " +
 			"`retry_previous: true` to install them and re-run the same code, instead " +
 			"of resending the source. `retry_previous` re-runs the last program and " +
-			"requires `code` to be omitted. Returns combined stdout/stderr. By " +
+			"requires `code` to be omitted. The code run is killed after " +
+			`${DEFAULT_TIMEOUT_SECONDS} seconds unless \`timeout\` (in seconds) says ` +
+			"otherwise; `pip` installs are not bounded by that timeout. Returns " +
+			"combined stdout/stderr. By " +
 			"default each end of very long output is cut to 50 lines; raise keepLines " +
 			"to keep more per end.",
 		promptSnippet: "Execute Python 3 with no shell quoting and shared pip installs",
@@ -204,6 +231,12 @@ export default function (pi: ExtensionAPI) {
 					minimum: 1,
 					description:
 						"Lines kept from each end before truncating; defaults to 50. Dropped lines are replaced by a marker naming the count and a temp file with the full output.",
+				}),
+			),
+			timeout: Type.Optional(
+				Type.Number({
+					description:
+						`Timeout in seconds for the code run before it is killed; defaults to ${DEFAULT_TIMEOUT_SECONDS}. Must be a positive finite number. Does not bound \`pip\` installs.`,
 				}),
 			),
 		}),
@@ -245,10 +278,12 @@ export default function (pi: ExtensionAPI) {
 			}
 			const venvInterpreter = venvPython(venvDirectory);
 			const interpreter = existsSync(venvInterpreter) ? venvInterpreter : "python3";
+			const timeoutSeconds = resolveTimeoutSeconds(params.timeout);
 
 			const result = await pi.exec(interpreter, ["-c", source], {
 				cwd: workingDirectory,
 				signal,
+				timeout: timeoutSeconds * 1000,
 			});
 
 			const output = combinedOutput(result);
@@ -257,6 +292,12 @@ export default function (pi: ExtensionAPI) {
 				truncateOutput(sections.join("\n"), params.keepLines ?? DEFAULT_KEEP_LINES) ||
 				"(no output)";
 
+			if (result.killed) {
+				if (signal?.aborted) {
+					throw new Error(`python: aborted\n\n${text}`);
+				}
+				throw new Error(`python: timed out after ${timeoutSeconds}s\n\n${text}`);
+			}
 			if (result.code !== 0) {
 				throw new Error(`${text}\n\n[exit code ${result.code}]`);
 			}
