@@ -3,8 +3,8 @@
  *
  * The model passes raw source in `code`. It is spawned as
  * `python3 -c <code>` with the source as one argv entry, so no shell ever
- * parses it and nothing in the source needs escaping or fences. The session
- * working directory is the cwd.
+ * parses it and nothing in the source needs escaping or fences. The run starts
+ * in the session working directory unless `cwd` names another directory.
  *
  * Each call is a fresh interpreter: definitions and imports do not carry over
  * between calls.
@@ -21,9 +21,9 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import {
 	DEFAULT_MAX_BYTES,
 	getAgentDir,
@@ -69,6 +69,31 @@ function combinedOutput(result: { stdout: string; stderr: string }): string {
 		.filter((stream) => stream.trim())
 		.join("\n")
 		.trim();
+}
+
+function resolveWorkingDirectory(
+	requestedDirectory: string | undefined,
+	sessionDirectory: string,
+): string {
+	if (sessionDirectory.length === 0) {
+		throw new Error("python: session working directory is empty");
+	}
+	if (requestedDirectory === undefined) {
+		return sessionDirectory;
+	}
+	const trimmedDirectory = requestedDirectory.trim();
+	if (trimmedDirectory.length === 0) {
+		throw new Error("python: cwd is empty");
+	}
+	const absoluteDirectory = resolve(sessionDirectory, trimmedDirectory);
+	const stats = statSync(absoluteDirectory, { throwIfNoEntry: false });
+	if (stats === undefined) {
+		throw new Error(`python: cwd does not exist: ${absoluteDirectory}`);
+	}
+	if (!stats.isDirectory()) {
+		throw new Error(`python: cwd is not a directory: ${absoluteDirectory}`);
+	}
+	return absoluteDirectory;
 }
 
 function globalVenvDirectory(): string {
@@ -122,6 +147,7 @@ async function installPackages(
 
 export default function (pi: ExtensionAPI) {
 	let lastCode: string | undefined;
+	let lastWorkingDirectory: string | undefined;
 
 	pi.registerTool({
 		name: "python",
@@ -129,9 +155,10 @@ export default function (pi: ExtensionAPI) {
 		description:
 			"Execute Python 3 code. Pass the program as raw source in `code`: it is " +
 			"handed to the interpreter as a single argument, so no shell quoting or " +
-			"escaping is needed and no code fences are wanted. Runs in the session " +
-			"working directory with a fresh interpreter each call; state does not " +
-			"persist between calls. Packages named in `pip` are installed with pip " +
+			"escaping is needed and no code fences are wanted. Runs with a fresh " +
+			"interpreter each call; state does not persist between calls. By default " +
+			"the run starts in the session working directory; pass `cwd` to start " +
+			"elsewhere. Packages named in `pip` are installed with pip " +
 			"into a virtual environment shared by every pi session before the code " +
 			"runs; the environment is created on first use, and later calls run " +
 			"inside it. Assume the packages you need are available: if the code fails " +
@@ -166,6 +193,12 @@ export default function (pi: ExtensionAPI) {
 						"Re-run the code from the previous python call instead of sending it again. Requires `code` to be omitted.",
 				}),
 			),
+			cwd: Type.Optional(
+				Type.String({
+					description:
+						"Working directory for the run. A relative path resolves against the session working directory. Defaults to the session working directory and must be an existing directory.",
+				}),
+			),
 			keepLines: Type.Optional(
 				Type.Integer({
 					minimum: 1,
@@ -195,6 +228,14 @@ export default function (pi: ExtensionAPI) {
 			}
 			lastCode = source;
 
+			const requestedWorkingDirectory =
+				params.cwd ?? (retryPrevious ? lastWorkingDirectory : undefined);
+			const workingDirectory = resolveWorkingDirectory(
+				requestedWorkingDirectory,
+				ctx.cwd,
+			);
+			lastWorkingDirectory = workingDirectory;
+
 			const packages = params.pip ?? [];
 			const venvDirectory = globalVenvDirectory();
 			let installNote = "";
@@ -206,7 +247,7 @@ export default function (pi: ExtensionAPI) {
 			const interpreter = existsSync(venvInterpreter) ? venvInterpreter : "python3";
 
 			const result = await pi.exec(interpreter, ["-c", source], {
-				cwd: ctx.cwd,
+				cwd: workingDirectory,
 				signal,
 			});
 
