@@ -56,6 +56,13 @@ chore: update docs
 refactor(skill): reword output guidance
 ```
 
+## Dependencies
+
+`package.json` overrides `encoding-sniffer` to v1. Cheerio still asks for
+v0.2, whose `whatwg-encoding` dependency is deprecated and makes `npm install`
+print a warning; v1 drops it for `@exodus/bytes` and keeps the API cheerio
+uses. The override can go once cheerio depends on v1 itself.
+
 ## Layout
 
 - `browser-tools/` is its own subproject. Keep its details (setup, usage,
