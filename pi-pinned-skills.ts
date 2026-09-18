@@ -7,16 +7,20 @@
  * system prompt on every turn, so their rules always apply.
  *
  * Config, first found wins:
- *   <cwd>/.pi/pinned-skills.json     project, honored only when the project is trusted
- *   <agent-dir>/pinned-skills.json   global
+ *   <cwd>/.pi/pinned-skills.json           project, honored only when trusted
+ *   `pi-pinned-skills.skills` in pi-tweaks.json   global (see pi-tweaks-config.ts)
+ *   <agent-dir>/pinned-skills.json         legacy global, until the section exists
  *
- * Format: a JSON array of skill names.
+ * Format: a JSON array of skill names, or a `skills` array in the section:
  *
  *   ["brand-guidelines", "sql-style"]
  *
+ *   { "pi-pinned-skills": { "enabled": true, "skills": ["sql-style"] } }
+ *
  * The appended block is byte-identical on every turn and follows config order,
  * so it stays inside the provider's cached prefix. Unknown names are skipped;
- * run /pinned-skills to see which ones resolved.
+ * run /pinned-skills to see which ones resolved. `"enabled": false` turns the
+ * extension off.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -27,10 +31,21 @@ import {
 	type ExtensionContext,
 	getAgentDir,
 } from "@earendil-works/pi-coding-agent";
+import {
+	configFilePath,
+	isExtensionEnabled,
+	readSection,
+	stringArrayValue,
+} from "./pi-tweaks-config";
 
-const CONFIG_FILE = "pinned-skills.json";
+const EXTENSION = "pi-pinned-skills";
+const LEGACY_FILE = "pinned-skills.json"; // the previous global home
 
 type SkillEntry = { name: string; filePath: string };
+type ResolvedNames =
+	| { kind: "names"; path: string; names: string[] }
+	| { kind: "missing" }
+	| { kind: "invalid"; path: string };
 
 function readNames(path: string): string[] | null {
 	if (!existsSync(path)) return null;
@@ -43,11 +58,33 @@ function readNames(path: string): string[] | null {
 	}
 }
 
-function configPath(ctx: ExtensionContext): string | null {
-	const project = join(ctx.cwd, CONFIG_DIR_NAME, CONFIG_FILE);
-	if (ctx.isProjectTrusted() && existsSync(project)) return project;
-	const global = join(getAgentDir(), CONFIG_FILE);
-	return existsSync(global) ? global : null;
+function resolveNames(ctx: ExtensionContext): ResolvedNames {
+	const project = join(ctx.cwd, CONFIG_DIR_NAME, LEGACY_FILE);
+	if (ctx.isProjectTrusted() && existsSync(project)) {
+		const names = readNames(project);
+		return names
+			? { kind: "names", path: project, names }
+			: { kind: "invalid", path: project };
+	}
+
+	const section = readSection(EXTENSION);
+	if (section?.skills !== undefined) {
+		if (!Array.isArray(section.skills)) {
+			return { kind: "invalid", path: configFilePath() };
+		}
+		return {
+			kind: "names",
+			path: configFilePath(),
+			names: stringArrayValue(section, "skills", []),
+		};
+	}
+
+	const global = join(getAgentDir(), LEGACY_FILE);
+	if (!existsSync(global)) return { kind: "missing" };
+	const names = readNames(global);
+	return names
+		? { kind: "names", path: global, names }
+		: { kind: "invalid", path: global };
 }
 
 /** Frontmatter is metadata: the description is already in the skills list. */
@@ -93,14 +130,16 @@ function build(
 }
 
 export default function pinnedSkills(pi: ExtensionAPI) {
+	if (!isExtensionEnabled(EXTENSION)) return;
+
 	pi.on("before_agent_start", async (event, ctx) => {
-		const path = configPath(ctx);
-		if (!path) return;
+		const resolved = resolveNames(ctx);
+		if (resolved.kind !== "names" || resolved.names.length === 0) return;
 
-		const names = readNames(path);
-		if (!names || names.length === 0) return;
-
-		const { text } = build(event.systemPromptOptions.skills ?? [], names);
+		const { text } = build(
+			event.systemPromptOptions.skills ?? [],
+			resolved.names,
+		);
 		if (!text) return;
 
 		return { systemPrompt: `${event.systemPrompt}\n\n${text}\n` };
@@ -109,26 +148,27 @@ export default function pinnedSkills(pi: ExtensionAPI) {
 	pi.registerCommand("pinned-skills", {
 		description: "Show pinned skills and report names that did not resolve",
 		handler: async (_args, ctx) => {
-			const path = configPath(ctx);
-			if (!path) {
-				ctx.ui.notify(`No ${CONFIG_FILE} found`, "warning");
+			const resolved = resolveNames(ctx);
+			if (resolved.kind === "missing") {
+				ctx.ui.notify(
+					`No ${LEGACY_FILE} or ${EXTENSION}.skills found`,
+					"warning",
+				);
 				return;
 			}
-
-			const names = readNames(path);
-			if (!names) {
-				ctx.ui.notify(`${path} is not a JSON array of skill names`, "error");
+			if (resolved.kind === "invalid") {
+				ctx.ui.notify(`${resolved.path} is not a list of skill names`, "error");
 				return;
 			}
 
 			const { text, missing } = build(
 				ctx.getSystemPromptOptions().skills ?? [],
-				names,
+				resolved.names,
 			);
 			const lines = [
-				`config: ${path}`,
-				`pinned: ${names.join(", ") || "none"}`,
-				`resolved: ${names.length - missing.length} of ${names.length}`,
+				`config: ${resolved.path}`,
+				`pinned: ${resolved.names.join(", ") || "none"}`,
+				`resolved: ${resolved.names.length - missing.length} of ${resolved.names.length}`,
 				`appended: ${Buffer.byteLength(text)} bytes`,
 			];
 			if (missing.length > 0) lines.push(`missing: ${missing.join(", ")}`);

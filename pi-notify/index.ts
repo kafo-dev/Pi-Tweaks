@@ -5,16 +5,24 @@
  *   agent_settled    pi finished the turn and is waiting for your reply
  *   ui_prompt_start  pi is blocked on a confirm/select/input/editor dialog
  *
- * Settings: $PI_CODING_AGENT_DIR/pi-notify.json (~/.pi/agent/pi-notify.json)
+ * Config: the `pi-notify` section of `pi-tweaks.json` (see
+ * pi-tweaks-config.ts).
+ *
  *   {
- *     "backend": "off" | "termcodes" | "notify-send",
- *     "phone":   "off" | "ping" | "ring",
- *     "device":  "kdeconnect device id"     // empty = auto-detect
+ *     "pi-notify": {
+ *       "enabled": true,
+ *       "backend": "off" | "termcodes" | "notify-send",
+ *       "phone":   "off" | "ping" | "ring",
+ *       "device":  "kdeconnect device id"     // empty = auto-detect
+ *     }
  *   }
  *
  * `backend` defaults to "termcodes" and `phone` to "off": installing the
  * package gives you terminal notifications immediately, and no phone is rung
- * until you ask for one. `/notify` writes changes back to that file.
+ * until you ask for one. `"enabled": false` turns the extension off. `/notify`
+ * writes changes back to that file. The old `pi-notify.json` is still read
+ * until the `pi-notify` section exists; the first write migrates the settings
+ * and the old file is ignored from then on.
  *
  * Commands:
  *   /notify                      show settings
@@ -32,18 +40,24 @@
  */
 
 import { execFile } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
-import type {
-	ExtensionAPI,
-	ExtensionContext,
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+	type ExtensionAPI,
+	type ExtensionContext,
+	getAgentDir,
 } from "@earendil-works/pi-coding-agent";
+import {
+	configFilePath,
+	isExtensionEnabled,
+	readSection,
+	type Section,
+	stringValue,
+	updateSection,
+} from "../pi-tweaks-config";
 
-const SETTINGS_PATH = join(
-	process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"),
-	"pi-notify.json",
-);
+const EXTENSION = "pi-notify";
+const LEGACY_FILE = "pi-notify.json"; // read until pi-tweaks.json has a section
 
 interface Settings {
 	backend: string;
@@ -53,7 +67,7 @@ interface Settings {
 
 const DEFAULTS: Settings = { backend: "termcodes", phone: "off", device: "" };
 
-/** Allowed values per key. An empty list means "any non-empty string". */
+/** Allowed values per key. An empty list means "any string". */
 const OPTIONS: Record<keyof Settings, string[]> = {
 	backend: ["off", "termcodes", "notify-send"],
 	phone: ["off", "ping", "ring"],
@@ -62,33 +76,36 @@ const OPTIONS: Record<keyof Settings, string[]> = {
 
 const KEYS = Object.keys(OPTIONS) as (keyof Settings)[];
 
-function loadSettings(): Settings {
-	let file: Partial<Settings>;
+/** The previous home of these settings, read only until the section exists. */
+function legacySection(): Section | null {
 	try {
-		file = JSON.parse(readFileSync(SETTINGS_PATH, "utf8"));
+		const parsed: unknown = JSON.parse(
+			readFileSync(join(getAgentDir(), LEGACY_FILE), "utf8"),
+		);
+		return typeof parsed === "object" &&
+			parsed !== null &&
+			!Array.isArray(parsed)
+			? (parsed as Section)
+			: null;
 	} catch {
-		return { ...DEFAULTS };
+		return null;
 	}
+}
 
+function loadSettings(): Settings {
+	const section = readSection(EXTENSION) ?? legacySection();
 	const settings = { ...DEFAULTS };
 	for (const key of KEYS) {
-		const value = file[key];
-		if (typeof value !== "string") continue;
-		if (OPTIONS[key].length ? OPTIONS[key].includes(value) : value !== "")
-			settings[key] = value;
+		settings[key] = stringValue(section, key, OPTIONS[key], DEFAULTS[key]);
 	}
 	return settings;
 }
 
 const settings = loadSettings();
 
+/** Persist to pi-tweaks.json; other sections and `enabled` are preserved. */
 function saveSettings() {
-	try {
-		mkdirSync(dirname(SETTINGS_PATH), { recursive: true });
-		writeFileSync(SETTINGS_PATH, `${JSON.stringify(settings, null, 2)}\n`);
-	} catch {
-		// Read-only config dir: keep going with in-memory settings.
-	}
+	updateSection(EXTENSION, { ...settings });
 }
 
 const describe = () =>
@@ -137,6 +154,8 @@ async function notifyUser(ctx: ExtensionContext, body: string) {
 }
 
 export default function (pi: ExtensionAPI) {
+	if (!isExtensionEnabled(EXTENSION)) return;
+
 	// `/stop` aborts the turn on purpose, so the settle that follows is not news.
 	// pi-stop announces the abort; skip that one alert.
 	let turnAborted = false;
@@ -159,14 +178,14 @@ export default function (pi: ExtensionAPI) {
 
 	pi.registerCommand("notify", {
 		description:
-			"Show or change pi-notify settings (persisted to pi-notify.json)",
+			"Show or change pi-notify settings (persisted to pi-tweaks.json)",
 		handler: async (args, ctx) => {
 			const [name, value] = args.trim().split(/\s+/);
 			const key = name as keyof Settings;
 			const choices = OPTIONS[key];
 
 			if (!name) {
-				ctx.ui.notify(`${describe()} — ${SETTINGS_PATH}`, "info");
+				ctx.ui.notify(`${describe()} — ${configFilePath()}`, "info");
 				return;
 			}
 			if (!choices) {

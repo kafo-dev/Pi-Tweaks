@@ -4,26 +4,30 @@
  * pi compacts by asking the model to summarize the messages it is about to
  * drop. This extension replaces that instruction with the body of a Markdown
  * file, so a summary can keep what this project cares about. Configure it in
- * `settings.json`:
+ * the `pi-compaction-prompt` section of `pi-tweaks.json` (see
+ * pi-tweaks-config.ts):
  *
  *   {
- *     "compaction": {
+ *     "pi-compaction-prompt": {
+ *       "enabled": true,
  *       "promptFile": "prompts/compact.md"
  *     }
  *   }
  *
  * The value is a path: absolute, `~`-prefixed, or relative to the pi agent
  * directory (so `prompts/compact.md` means `<agent-dir>/prompts/compact.md`,
- * the same place pi keeps prompt templates). A project settings file wins
- * over the global one and is honored only for trusted projects.
+ * the same place pi keeps prompt templates). For backward compatibility, the
+ * old `compaction.promptFile` in `settings.json` is used when the section sets
+ * no `promptFile`: a project settings file wins over the global one and is
+ * honored only for trusted projects.
  *
  * The file's body is the instruction text; YAML frontmatter is metadata and
  * is stripped. The extension appends the previous summary, any `/compact`
  * instructions, and the conversation, so the file only says what a good
  * summary contains.
  *
- * Without a readable `compaction.promptFile` the extension stays out of the
- * way and pi's default compaction runs.
+ * Without a readable prompt file the extension stays out of the way and pi's
+ * default compaction runs. `"enabled": false` turns the extension off.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -38,7 +42,13 @@ import {
 	getAgentDir,
 	serializeConversation,
 } from "@earendil-works/pi-coding-agent";
+import {
+	isExtensionEnabled,
+	readSection,
+	stringValue,
+} from "./pi-tweaks-config";
 
+const EXTENSION = "pi-compaction-prompt";
 const SETTINGS_FILE = "settings.json";
 const PROMPT_FILE_KEY = "promptFile";
 const SUMMARY_MAX_TOKENS = 8192;
@@ -79,8 +89,16 @@ function promptFileValue(settingsPath: string): string | null {
 	return trimmed;
 }
 
-/** Project settings win, then the global ones. */
+/** The pi-tweaks section wins, then project settings, then global settings. */
 function configuredPromptFile(ctx: ExtensionContext): string | null {
+	const fromTweaks = stringValue(
+		readSection(EXTENSION),
+		PROMPT_FILE_KEY,
+		[],
+		"",
+	).trim();
+	if (fromTweaks.length > 0) return fromTweaks;
+
 	const project = join(ctx.cwd, CONFIG_DIR_NAME, SETTINGS_FILE);
 	if (ctx.isProjectTrusted()) {
 		const fromProject = promptFileValue(project);
@@ -183,13 +201,12 @@ function summaryText(content: { type: string; text?: string }[]): string {
 }
 
 export default function compactionPrompt(pi: ExtensionAPI) {
+	if (!isExtensionEnabled(EXTENSION)) return;
+
 	pi.on("session_start", (_event, ctx) => {
 		const prompt = resolvePrompt(ctx);
 		if (prompt.kind === "missing") {
-			ctx.ui.notify(
-				`compaction.promptFile is not readable: ${prompt.path}`,
-				"warning",
-			);
+			ctx.ui.notify(`promptFile is not readable: ${prompt.path}`, "warning");
 		}
 	});
 
@@ -197,10 +214,7 @@ export default function compactionPrompt(pi: ExtensionAPI) {
 		const prompt = resolvePrompt(ctx);
 		if (prompt.kind === "off") return;
 		if (prompt.kind === "missing") {
-			ctx.ui.notify(
-				`compaction.promptFile is not readable: ${prompt.path}`,
-				"warning",
-			);
+			ctx.ui.notify(`promptFile is not readable: ${prompt.path}`, "warning");
 			return;
 		}
 

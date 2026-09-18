@@ -22,17 +22,25 @@ updating.
 
 `backend` defaults to `termcodes` and `phone` to `off`: you get terminal
 notifications straight away, and no phone is rung until you set one. Settings
-live in `pi-notify.json` next to pi's own `settings.json`, i.e.
-`$PI_CODING_AGENT_DIR/pi-notify.json` (`~/.pi/agent/pi-notify.json`). `/notify`
-creates and updates that file.
+live in the `pi-notify` section of `pi-tweaks.json` in pi's agent directory
+(`$PI_CODING_AGENT_DIR/pi-tweaks.json`, or `~/.pi/agent/pi-tweaks.json`).
+`/notify` creates and updates that section; the other sections and the
+`enabled` switch are preserved.
 
 ```json
 {
-  "backend": "termcodes",
-  "phone": "ring",
-  "device": ""
+  "pi-notify": {
+    "enabled": true,
+    "backend": "termcodes",
+    "phone": "ring",
+    "device": ""
+  }
 }
 ```
+
+Set `"enabled": false` to turn the extension off. The old `pi-notify.json` is
+still read until the section exists; the first `/notify` write migrates the
+settings into `pi-tweaks.json`.
 
 | Key | Values | Meaning |
 |-----|--------|---------|

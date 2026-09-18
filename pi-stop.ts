@@ -8,11 +8,17 @@
  *
  * `/stop` also emits `turn-aborted` on the shared event bus, so pi-notify can
  * skip the alert for the settle it causes.
+ *
+ * Config: `"enabled": false` under `pi-stop` in `pi-tweaks.json` turns the
+ * extension off. See pi-tweaks-config.ts.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { isExtensionEnabled } from "./pi-tweaks-config";
 
 export default function (pi: ExtensionAPI) {
+	if (!isExtensionEnabled("pi-stop")) return;
+
 	pi.registerCommand("stop", {
 		description: "Abort the current turn (same as Escape)",
 		handler: async (_args, ctx) => {

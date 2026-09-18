@@ -21,9 +21,13 @@
  *
  * A message that already ends in a stamp is left alone, so a handler left bound
  * by a reload cannot double-stamp through the chained input transform.
+ *
+ * Config: `"enabled": false` under `pi-timestamps` in `pi-tweaks.json` turns
+ * the extension off; it has no other settings. See pi-tweaks-config.ts.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { isExtensionEnabled } from "./pi-tweaks-config";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = [
@@ -155,6 +159,8 @@ function appendToLastText(
 }
 
 export default function timestamps(pi: ExtensionAPI) {
+	if (!isExtensionEnabled("pi-timestamps")) return;
+
 	// Hide the stamp from the reader: the session and the model context keep it.
 	pi.registerMarkdownTransformer((markdown) =>
 		markdown.replace(DISPLAY_STAMP, ""),

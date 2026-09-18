@@ -18,6 +18,10 @@
  * Output larger than `keepLines` lines at each end is cut to the first and last
  * `keepLines` lines, with the count of dropped lines and the path of a temp file
  * holding the full output shown in a marker between them.
+ *
+ * Config: `pi-python.timeoutSeconds` and `pi-python.keepLines` in
+ * `pi-tweaks.json` override the defaults (10 seconds, 50 lines);
+ * `"enabled": false` turns the extension off. See pi-tweaks-config.ts.
  */
 
 import { randomUUID } from "node:crypto";
@@ -32,12 +36,31 @@ import {
 	truncateTail,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import {
+	isExtensionEnabled,
+	numberValue,
+	readSection,
+} from "./pi-tweaks-config";
 
-const DEFAULT_KEEP_LINES = 50; // lines kept from each end of truncated output
-const DEFAULT_TIMEOUT_SECONDS = 10; // code run is killed after this long
+const EXTENSION = "pi-python";
+const DEFAULT_KEEP_LINES = 50; // when pi-tweaks.json says nothing
+const DEFAULT_TIMEOUT_SECONDS = 10; // when pi-tweaks.json says nothing
 const MAX_TIMEOUT_SECONDS = 2147483647 / 1000; // 32-bit setTimeout ceiling
 const VENV_DIRECTORY_NAME = "python-venv"; // venv lives under pi's agent dir
 const VENV_PYTHON_PATH = join("bin", "python3"); // interpreter inside the venv
+
+// Read once at load, like every other Pi-Tweaks setting.
+const pythonSection = readSection(EXTENSION);
+const KEEP_LINES = numberValue(pythonSection, "keepLines", DEFAULT_KEEP_LINES, {
+	positive: true,
+	integer: true,
+});
+const TIMEOUT_SECONDS = numberValue(
+	pythonSection,
+	"timeoutSeconds",
+	DEFAULT_TIMEOUT_SECONDS,
+	{ positive: true, atMost: MAX_TIMEOUT_SECONDS },
+);
 
 function truncateOutput(output: string, keepLines: number): string {
 	const lines = output ? output.split("\n") : [];
@@ -87,7 +110,7 @@ function combinedOutput(result: { stdout: string; stderr: string }): string {
 
 function resolveTimeoutSeconds(timeout: number | undefined): number {
 	if (timeout === undefined) {
-		return DEFAULT_TIMEOUT_SECONDS;
+		return TIMEOUT_SECONDS;
 	}
 	if (!Number.isFinite(timeout)) {
 		throw new Error("python: timeout must be a finite number of seconds");
@@ -157,7 +180,7 @@ async function ensureVenv(
 		throw new Error("python: venv creation aborted");
 	}
 	if (result.code !== 0) {
-		const output = truncateOutput(combinedOutput(result), DEFAULT_KEEP_LINES);
+		const output = truncateOutput(combinedOutput(result), KEEP_LINES);
 		throw new Error(`python: failed to create venv\n${output}`);
 	}
 }
@@ -179,11 +202,13 @@ async function installPackages(
 	if (result.code === 0) {
 		return `Installed pip packages: ${packages.join(", ")}`;
 	}
-	const output = truncateOutput(combinedOutput(result), DEFAULT_KEEP_LINES);
+	const output = truncateOutput(combinedOutput(result), KEEP_LINES);
 	throw new Error(`python: pip install failed\n${output}`);
 }
 
 export default function (pi: ExtensionAPI) {
+	if (!isExtensionEnabled(EXTENSION)) return;
+
 	let lastCode: string | undefined;
 	let lastWorkingDirectory: string | undefined;
 
@@ -205,11 +230,11 @@ export default function (pi: ExtensionAPI) {
 			"`retry_previous: true` to install them and re-run the same code, instead " +
 			"of resending the source. `retry_previous` re-runs the last program and " +
 			"requires `code` to be omitted. The code run is killed after " +
-			`${DEFAULT_TIMEOUT_SECONDS} seconds unless \`timeout\` (in seconds) says ` +
+			`${TIMEOUT_SECONDS} seconds unless \`timeout\` (in seconds) says ` +
 			"otherwise; `pip` installs are not bounded by that timeout. Returns " +
 			"combined stdout/stderr. By " +
-			"default each end of very long output is cut to 50 lines; raise keepLines " +
-			"to keep more per end.",
+			`default each end of very long output is cut to ${KEEP_LINES} lines; raise ` +
+			"keepLines to keep more per end.",
 		promptSnippet:
 			"Execute Python 3 with no shell quoting and shared pip installs",
 		promptGuidelines: [
@@ -250,7 +275,7 @@ export default function (pi: ExtensionAPI) {
 			),
 			timeout: Type.Optional(
 				Type.Number({
-					description: `Timeout in seconds for the code run before it is killed; defaults to ${DEFAULT_TIMEOUT_SECONDS}. Must be a positive finite number. Does not bound \`pip\` installs.`,
+					description: `Timeout in seconds for the code run before it is killed; defaults to ${TIMEOUT_SECONDS}. Must be a positive finite number. Does not bound \`pip\` installs.`,
 				}),
 			),
 		}),
@@ -314,10 +339,8 @@ export default function (pi: ExtensionAPI) {
 				(section) => section.length > 0,
 			);
 			const text =
-				truncateOutput(
-					sections.join("\n"),
-					params.keepLines ?? DEFAULT_KEEP_LINES,
-				) || "(no output)";
+				truncateOutput(sections.join("\n"), params.keepLines ?? KEEP_LINES) ||
+				"(no output)";
 
 			if (result.killed) {
 				if (signal?.aborted) {
