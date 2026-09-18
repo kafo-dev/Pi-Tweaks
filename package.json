@@ -1,6 +1,7 @@
 {
 	"name": "pi-tweaks",
 	"version": "0.1.0",
+	"type": "module",
 	"description": "Miscellaneous tools for the pi coding agent harness: skills, extensions, and a bwrap sandbox wrapper.",
 	"license": "(ISC AND MIT)",
 	"repository": {
