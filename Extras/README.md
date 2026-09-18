@@ -7,9 +7,10 @@ A POSIX `sh` wrapper around Pi that runs the agent inside a
 
 Pi has no built-in sandbox: built-in tools, extensions, and package installs
 run with the permissions of the user account. This wrapper binds the whole
-filesystem read-only and re-binds only the project directory plus a few state
-directories read-write, so a session cannot write anywhere else under `$HOME`.
-It is silent on the sandboxed path.
+filesystem read-only and re-binds only the project directory, an agent
+scratchpad, and a few state directories read-write, so a session cannot write
+anywhere else under `$HOME`. It is silent on the sandboxed path, except when it
+starts from `$HOME` (see below).
 
 ### Install
 
@@ -28,19 +29,31 @@ name on `PATH` does not cause recursion.
 |------|-----|
 | `$PWD` | the project |
 | `$PI_CODING_AGENT_DIR` (default `~/.pi/agent`) | settings, sessions, trust, packages, auth |
+| `$PI_CODING_AGENT_DIR/scratchpad` (default `~/.pi/agent/scratchpad`) | agent scratch files; the fallback when started from `$HOME` |
 | `$XDG_CACHE_HOME` (default `~/.cache`) | tool caches, browser profiles |
 | `~/.agents` | global skills (`~/.agents/skills`) |
 | `~/Documents/AGENT-NOTES.md` | cross-project agent scratch notes, if the file exists (`--bind-try`) |
 
 Everything else is read-only. Language and package-manager directories are
 deliberately not bound: add the ones a session needs to the `rw-paths.txt` file
-(see below). The wrapper refuses to start if `$PWD` is `$HOME` or an ancestor
-of it, since binding the project read-write would expose `$HOME`.
+(see below).
 
 The agent directory is shared read-write with the host, so auth, sessions, and
 installed packages carry over between sandboxed and unsandboxed runs. That also
 means provider credentials are visible inside the sandbox; treat untrusted
 projects accordingly.
+
+Starting from `$HOME` or an ancestor of it would expose all of `$HOME` if the
+project directory were bound read-write. Instead the project directory stays
+read-only for that run, and the agent is told through an appended
+system-prompt note that files it needs to write belong in the scratchpad.
+
+### Scratchpad
+
+The agent gets a scratchpad inside the agent directory, at
+`$PI_CODING_AGENT_DIR/scratchpad` (default `~/.pi/agent/scratchpad`). It is
+bound read-write on every run and is the designated place for temporary files
+when the project directory is read-only.
 
 ### Extra read-write paths
 
@@ -70,7 +83,7 @@ widen its own mounts.
 | Variable | Purpose |
 |----------|---------|
 | `BWRAP` | Set to `0` to skip the sandbox. The wrapper then warns and runs `pi` unsandboxed with the same arguments. |
-| `PI_CODING_AGENT_DIR` | Override the agent directory that is bound read-write. Default `~/.pi/agent`. Also relocates `rw-paths.txt` to its parent. |
+| `PI_CODING_AGENT_DIR` | Override the agent directory that is bound read-write. Default `~/.pi/agent`. Also moves `rw-paths.txt` to its parent and the scratchpad to `$PI_CODING_AGENT_DIR/scratchpad`. |
 | `XDG_CACHE_HOME` | Override the cache directory that is bound read-write. Default `~/.cache`. |
 
 ### Notes and limitations

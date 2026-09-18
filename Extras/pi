@@ -3,8 +3,10 @@
 #
 # Pi has no built-in sandbox and runs tools with the permissions of the user
 # account. This wrapper binds the whole filesystem read-only and re-binds only
-# the project directory plus a few state directories read-write, so a session
-# cannot write anywhere else under $HOME.
+# the project directory, a scratchpad, and a few state directories read-write,
+# so a session cannot write anywhere else under $HOME. Started from $HOME (or
+# an ancestor), the project directory stays read-only and the agent is pointed
+# at the scratchpad instead.
 
 notes_file="$HOME/Documents/AGENT-NOTES.md"
 
@@ -17,6 +19,10 @@ cache_dir=${XDG_CACHE_HOME:-"$HOME/.cache"}
 # Global skills tree; writable so skills can be installed and updated.
 agents_dir="$HOME/.agents"
 
+# Agent scratchpad inside the agent directory. Bound read-write by default;
+# the fallback when the project directory is $HOME.
+scratch_dir="$agent_dir/scratchpad"
+
 if [ "${BWRAP:-1}" = "0" ]; then
     echo "pi-wrapper: bwrap is not isolating the agent; pi runs with full permissions." >&2
     sleep 1
@@ -28,18 +34,24 @@ home_real=$(cd "$HOME" && pwd -P)
 
 host=$(hostname | tr -c 'A-Za-z0-9.-' '-')
 
+# Binding $HOME (or an ancestor) read-write would expose the whole home
+# directory, so such a session keeps the project directory read-only and uses
+# the scratchpad instead.
+home_readonly=0
 if [ "$cwd" = "$home_real" ]; then
-    echo "pi-wrapper: refusing to sandbox from $cwd (would expose \$HOME read-write). cd into a project directory." >&2
-    exit 1
+    home_readonly=1
+fi
+# A bare "/" is an ancestor of every home directory.
+if [ "$cwd" = / ]; then
+    home_readonly=1
 fi
 case "$home_real" in
 "$cwd"/*)
-    echo "pi-wrapper: refusing to sandbox from $cwd (would expose \$HOME read-write). cd into a project directory." >&2
-    exit 1
+    home_readonly=1
     ;;
 esac
 
-for d in "$agent_dir" "$cache_dir" "$agents_dir"; do
+for d in "$agent_dir" "$cache_dir" "$agents_dir" "$scratch_dir"; do
     mkdir -p "$d"
 done
 
@@ -54,7 +66,13 @@ rw_file="${agent_dir%/*}/rw-paths.txt"
 # binary in front, then prepend one bind per configured path. Prepending
 # reverses the configured order; every bind is read-write, so their relative
 # order does not matter.
-set -- "$real_pi" "$@"
+if [ "$home_readonly" = 1 ]; then
+    echo "pi-wrapper: $cwd is read-only; scratch files go in $scratch_dir." >&2
+    notice="The working directory ($cwd) is mounted read-only because it is \$HOME or above it. Use $scratch_dir for scratch files; it is writable."
+    set -- "$real_pi" --append-system-prompt "$notice" "$@"
+else
+    set -- "$real_pi" "$@"
+fi
 
 if [ -f "$rw_file" ]; then
     while IFS= read -r path || [ -n "$path" ]; do
@@ -77,6 +95,11 @@ if [ -f "$rw_file" ]; then
     done <"$rw_file"
 fi
 
+# The project directory is read-write only when it does not expose $HOME.
+if [ "$home_readonly" = 0 ]; then
+    set -- --bind "$cwd" "$cwd" "$@"
+fi
+
 set -- \
     --unshare-all \
     --share-net \
@@ -86,10 +109,10 @@ set -- \
     --proc /proc \
     --dev /dev \
     --tmpfs /tmp \
-    --bind "$cwd" "$cwd" \
     --bind "$agent_dir" "$agent_dir" \
     --bind "$cache_dir" "$cache_dir" \
     --bind "$agents_dir" "$agents_dir" \
+    --bind "$scratch_dir" "$scratch_dir" \
     --bind-try "$notes_file" "$notes_file" \
     "$@"
 
