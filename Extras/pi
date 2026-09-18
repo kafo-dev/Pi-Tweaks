@@ -8,8 +8,6 @@
 # an ancestor), the project directory stays read-only and the agent is pointed
 # at the scratchpad instead.
 
-notes_file="$HOME/Documents/AGENT-NOTES.md"
-
 real_pi=/usr/bin/pi
 bwrap=/usr/bin/bwrap
 
@@ -113,7 +111,6 @@ set -- \
     --bind "$cache_dir" "$cache_dir" \
     --bind "$agents_dir" "$agents_dir" \
     --bind "$scratch_dir" "$scratch_dir" \
-    --bind-try "$notes_file" "$notes_file" \
     "$@"
 
 exec "$bwrap" "$@"

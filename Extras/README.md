@@ -32,7 +32,6 @@ name on `PATH` does not cause recursion.
 | `$PI_CODING_AGENT_DIR/scratchpad` (default `~/.pi/agent/scratchpad`) | agent scratch files; the fallback when started from `$HOME` |
 | `$XDG_CACHE_HOME` (default `~/.cache`) | tool caches, browser profiles |
 | `~/.agents` | global skills (`~/.agents/skills`) |
-| `~/Documents/AGENT-NOTES.md` | cross-project agent scratch notes, if the file exists (`--bind-try`) |
 
 Everything else is read-only. Language and package-manager directories are
 deliberately not bound: add the ones a session needs to the `rw-paths.txt` file
@@ -73,8 +72,9 @@ does not exist is skipped and the wrapper still starts. An entry is taken
 literally: do not quote it, even when the path contains spaces. Non-absolute
 entries are ignored with a warning. The wrapper reads the file on the host
 before entering the sandbox, so the file itself does not need to be reachable
-inside it. Every listed path becomes writable by the agent, so list only
-directories the agent may modify; listing `/` or `$HOME` defeats the sandbox.
+inside it. Every listed path becomes writable by the agent, so list only paths
+the agent may modify; listing `/` or `$HOME` defeats the sandbox. A single file
+works as well as a directory, for example a notes file the agent maintains.
 By default the file itself is outside the writable set, so the agent cannot
 widen its own mounts.
 
