@@ -19,11 +19,15 @@ See [PATCHES.md](PATCHES.md) for details. In short:
 
 1. **Linux support** — [`browser-start-linux.js`](browser-start-linux.js):
    auto-detects Chromium and starts a dedicated, persistent agent profile at
-   `~/.cache/browser-tools` (`--profile` seeds it from the real profile).
+   `~/.cache/browser-tools` (`--profile` seeds it from the real profile). It
+   opens the `Default` profile there by default and refuses Guest, so Chrome
+   never shows the profile picker; `--list-profiles` lists the alternatives.
 2. **Output / context discipline** — folded into [`SKILL.md`](SKILL.md)
    (redirect tool output to a file and query it, return the smallest useful
    value, avoid needless screenshots, use standard filters).
-3. **`SKILL.md` fixes** — corrected setup path and documented the Linux script.
+3. **`SKILL.md` fixes** — corrected setup path, documented the Linux script,
+   and added profile-selection guidance (prefer the cached profile; on a fresh
+   agent profile ask before seeding; list and ask before using another).
 
 ## Install into pi
 
@@ -54,7 +58,8 @@ npm install          # scripts use puppeteer-core + the system browser
 ./browser-start.js [--profile]
 
 # Linux
-./browser-start-linux.js [--profile]
+./browser-start-linux.js [--profile] [--profile-directory <name>]
+./browser-start-linux.js --list-profiles
 
 ./browser-nav.js https://example.com [--new] [--reload]
 ./browser-eval.js 'document.title'

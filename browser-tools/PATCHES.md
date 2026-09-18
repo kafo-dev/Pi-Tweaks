@@ -24,9 +24,15 @@ The added script:
 - with `--profile`, seeds that profile via `rsync` from the real Chromium
   profile (auto-detected; `$BROWSER_PROFILE` override), excluding
   `SingletonLock`/`SingletonSocket`/`SingletonCookie` and session/tab files;
+- always passes `--profile-directory` (default `Default`, override with
+  `--profile-directory <name>` or `$BROWSER_PROFILE_DIR`) so Chrome never shows
+  the profile picker, and refuses `Guest Profile`, whose windows cannot open
+  new tabs over CDP;
+- `--list-profiles` prints the profiles and their display names from
+  `Local State`, so a different profile can be chosen without the picker;
 - reuses an existing `:9222` if one is already serving CDP;
 - launches detached with `--remote-debugging-port=9222 --user-data-dir=<agent>
-  --no-first-run --no-default-browser-check`.
+  --profile-directory=<profile> --no-first-run --no-default-browser-check`.
 
 ## Patch 2 — Output / context discipline
 
@@ -52,6 +58,10 @@ It also documents the `chrome-extension://` → `✗ No active tab found` gotcha
 - Fixed the setup path: `cd {baseDir}/browser-tools` → `cd {baseDir}`.
 - Documented the Linux start script alongside the macOS one.
 - Added the Output Discipline section (Patch 2).
+- Added profile guidance: prefer the cached `Default` agent profile, list the
+  profiles and ask the user before opening a different one, and never Guest.
+  On a fresh agent profile, ask whether to start clean or seed from one of the
+  user's real profiles before launching.
 
 The full diff is ~87 changed lines against upstream; regenerate it with the
 `git diff` command above.

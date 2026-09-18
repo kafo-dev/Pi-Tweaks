@@ -87,11 +87,64 @@ macOS (upstream script):
 Linux (this fork):
 
 ```bash
-{baseDir}/browser-start-linux.js            # Dedicated agent profile
-{baseDir}/browser-start-linux.js --profile  # Seed it from your real profile
+{baseDir}/browser-start-linux.js                       # Default agent profile
+{baseDir}/browser-start-linux.js --profile             # Seed it from a real profile
+{baseDir}/browser-start-linux.js --list-profiles       # List profiles in the agent profile
+{baseDir}/browser-start-linux.js --profile-directory "Profile 1"
 ```
 
-Launch Chrome with remote debugging on `:9222`. `--profile` preserves the user's authentication state. The Linux script auto-detects Chromium (override with `$CHROME_BIN`) and uses a dedicated, persistent profile at `~/.cache/browser-tools`, separate from your normal browser.
+Launch Chrome with remote debugging on `:9222`. The Linux script auto-detects
+Chromium (override with `$CHROME_BIN`) and uses a dedicated, persistent
+user-data-dir at `~/.cache/browser-tools`, separate from your normal browser.
+`--profile` seeds that user-data-dir from the user's real browser profile; it
+does not change which profile the agent opens.
+
+### Always use the cached agent profile
+
+By default the script opens the `Default` profile inside
+`~/.cache/browser-tools` and passes `--profile-directory` explicitly. **Prefer
+this profile** for everything, and only switch when the user explicitly asks
+for a different one.
+
+#### First run: ask before seeding
+
+If `~/.cache/browser-tools` does not exist yet, the agent profile is fresh.
+Do **not** silently pass `--profile`: seeding copies the user's real browser
+profile — cookies, logins, extensions and all — into the agent profile. They
+may want the agent to stay separate and log in there on its own, or to seed
+from a different profile than the one that is auto-detected.
+
+Ask the user which they want before starting:
+
+- **Start clean** — run `{baseDir}/browser-start-linux.js`; the agent profile
+  is empty and the user logs in to it separately.
+- **Seed from a real profile** — run
+  `{baseDir}/browser-start-linux.js --profile`. The source browser is
+  auto-detected; set `$BROWSER_PROFILE` to pick another one. To open a profile
+  other than `Default` inside the seeded copy, use `--profile-directory`
+  (list the options first).
+
+Use `{baseDir}/browser-start-linux.js --list-profiles` to see what already
+exists; "(none yet)" means the agent profile has never been launched.
+
+Chrome shows a profile picker when it is not told which profile to open. A
+picker leaves no `page` target, so the first tool call fails with `✗ No active
+tab found`. Choosing **Guest** is worse: guest windows refuse to open new tabs
+over CDP, so `browser-nav.js --new` fails with `Protocol error
+(Target.createTarget): Failed to open a new tab`.
+
+When the user does ask for another profile, never guess and never let the
+picker appear:
+
+1. Run `{baseDir}/browser-start-linux.js --list-profiles` to get the directory
+   names and display names inside `~/.cache/browser-tools`.
+2. Show the list to the user and ask which profile to use.
+3. Start it with `--profile-directory "<directory>"` (or set
+   `$BROWSER_PROFILE_DIR`).
+
+If Chrome is already serving `:9222`, the start script reuses it and cannot
+change its profile. A stale instance left on Guest (or on the picker) keeps
+failing: close that Chrome, then start again with the intended profile.
 
 ## Navigate
 
@@ -163,6 +216,9 @@ Navigate to a URL and extract readable content as markdown. Uses Mozilla Readabi
   `browser.pages()` can come back empty and you'll see `✗ No active tab found`.
   Navigate a normal page first:
   `{baseDir}/browser-nav.js https://example.com`.
+- The same `✗ No active tab found` appears when Chrome is stuck on its profile
+  picker, and `--new` fails outright on the Guest profile. See
+  [Always use the cached agent profile](#always-use-the-cached-agent-profile).
 - `browser-eval.js` prints objects and arrays as `key: value` lines. Return
   `JSON.stringify(...)` when you plan to pipe the result into a JSON tool.
 
