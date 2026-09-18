@@ -1,7 +1,7 @@
 {
 	"name": "pi-tweaks",
 	"version": "0.1.0",
-	"description": "Tweaks to pi — a patched browser-tools (Linux support + output discipline), keyless Exa web search, pi-notify for desktop and phone alerts, a python tool with no shell quoting that installs packages into a shared venv, a custom compaction prompt, pinned skills appended to the system prompt, a date and time stamp on each prompt and answer, and /exit as an alias for /quit",
+	"description": "Tweaks to pi — a patched browser-tools (Linux support + output discipline), keyless Exa web search, pi-notify for desktop and phone alerts, a python tool with no shell quoting that installs packages into a shared venv, a custom compaction prompt, pinned skills appended to the system prompt, a date and time stamp on each prompt and answer, and /exit as an alias for /quit, and a default timeout for the bash tool",
 	"license": "(ISC AND MIT)",
 	"repository": {
 		"type": "git",
@@ -13,6 +13,7 @@
 	"pi": {
 		"extensions": [
 			"./pi-notify/index.ts",
+			"./pi-bash-timeout.ts",
 			"./pi-compaction-prompt.ts",
 			"./pi-exit.ts",
 			"./pi-pinned-skills.ts",
