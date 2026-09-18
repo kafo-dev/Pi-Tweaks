@@ -35,7 +35,10 @@ import { execFile } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+	ExtensionAPI,
+	ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 
 const SETTINGS_PATH = join(
 	process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"),
@@ -71,7 +74,8 @@ function loadSettings(): Settings {
 	for (const key of KEYS) {
 		const value = file[key];
 		if (typeof value !== "string") continue;
-		if (OPTIONS[key].length ? OPTIONS[key].includes(value) : value !== "") settings[key] = value;
+		if (OPTIONS[key].length ? OPTIONS[key].includes(value) : value !== "")
+			settings[key] = value;
 	}
 	return settings;
 }
@@ -117,7 +121,9 @@ async function notifyPhone(body: string) {
 	if (!device) return;
 	execFile(
 		"kdeconnect-cli",
-		settings.phone === "ring" ? ["-d", device, "--ring"] : ["-d", device, "--ping-msg", body],
+		settings.phone === "ring"
+			? ["-d", device, "--ring"]
+			: ["-d", device, "--ping-msg", body],
 		() => {},
 	);
 }
@@ -152,7 +158,8 @@ export default function (pi: ExtensionAPI) {
 	);
 
 	pi.registerCommand("notify", {
-		description: "Show or change pi-notify settings (persisted to pi-notify.json)",
+		description:
+			"Show or change pi-notify settings (persisted to pi-notify.json)",
 		handler: async (args, ctx) => {
 			const [name, value] = args.trim().split(/\s+/);
 			const key = name as keyof Settings;
@@ -180,7 +187,10 @@ export default function (pi: ExtensionAPI) {
 
 			const valid = choices.length ? choices.includes(value) : value !== "";
 			if (!valid) {
-				ctx.ui.notify(`${name} must be one of: ${choices.join(", ") || "a device id"}`, "error");
+				ctx.ui.notify(
+					`${name} must be one of: ${choices.join(", ") || "a device id"}`,
+					"error",
+				);
 				return;
 			}
 
@@ -191,7 +201,8 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("notify-test", {
-		description: "Fire a confirmation dialog to test phone and local notifications",
+		description:
+			"Fire a confirmation dialog to test phone and local notifications",
 		handler: async (_args, ctx) => {
 			await ctx.ui.confirm("Pi", "Notification test");
 		},

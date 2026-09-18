@@ -33,10 +33,10 @@ import { uuidv7 } from "@earendil-works/pi-ai";
 import {
 	CONFIG_DIR_NAME,
 	convertToLlm,
-	getAgentDir,
-	serializeConversation,
 	type ExtensionAPI,
 	type ExtensionContext,
+	getAgentDir,
+	serializeConversation,
 } from "@earendil-works/pi-coding-agent";
 
 const SETTINGS_FILE = "settings.json";
@@ -219,9 +219,18 @@ export default function compactionPrompt(pi: ExtensionAPI) {
 			conversation,
 		);
 
+		const model = ctx.model;
+		if (!model) {
+			ctx.ui.notify(
+				"Compaction prompt skipped: no model is selected",
+				"warning",
+			);
+			return;
+		}
+
 		try {
 			const response = await ctx.modelRegistry.complete(
-				ctx.model,
+				model,
 				{
 					messages: [
 						{

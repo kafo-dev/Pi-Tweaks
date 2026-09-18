@@ -8,7 +8,10 @@
  * supported way to give a built-in tool a default.
  */
 
-import { isToolCallEventType, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import {
+	type ExtensionAPI,
+	isToolCallEventType,
+} from "@earendil-works/pi-coding-agent";
 
 const DEFAULT_BASH_TIMEOUT_SECONDS = 10; // default when the model passes none
 

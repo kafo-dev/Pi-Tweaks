@@ -26,10 +26,10 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
 	DEFAULT_MAX_BYTES,
+	type ExtensionAPI,
 	getAgentDir,
 	truncateHead,
 	truncateTail,
-	type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
@@ -41,7 +41,10 @@ const VENV_PYTHON_PATH = join("bin", "python3"); // interpreter inside the venv
 
 function truncateOutput(output: string, keepLines: number): string {
 	const lines = output ? output.split("\n") : [];
-	if (lines.length <= keepLines * 2 && Buffer.byteLength(output) <= DEFAULT_MAX_BYTES) {
+	if (
+		lines.length <= keepLines * 2 &&
+		Buffer.byteLength(output) <= DEFAULT_MAX_BYTES
+	) {
 		return output;
 	}
 
@@ -53,15 +56,24 @@ function truncateOutput(output: string, keepLines: number): string {
 	// slice the encoded bytes; stream mode drops a character split by the cut.
 	if (lines.length <= keepLines * 2) {
 		const bytes = Buffer.from(output, "utf8");
-		const kept = new TextDecoder("utf-8").decode(bytes.subarray(0, DEFAULT_MAX_BYTES), {
-			stream: true,
-		});
+		const kept = new TextDecoder("utf-8").decode(
+			bytes.subarray(0, DEFAULT_MAX_BYTES),
+			{
+				stream: true,
+			},
+		);
 		const omitted = bytes.length - Buffer.byteLength(kept, "utf8");
 		return `${kept}\n[... ${omitted} bytes truncated; full output: ${file} ...]`;
 	}
 
-	const head = truncateHead(output, { maxLines: keepLines, maxBytes: DEFAULT_MAX_BYTES / 2 });
-	const tail = truncateTail(output, { maxLines: keepLines, maxBytes: DEFAULT_MAX_BYTES / 2 });
+	const head = truncateHead(output, {
+		maxLines: keepLines,
+		maxBytes: DEFAULT_MAX_BYTES / 2,
+	});
+	const tail = truncateTail(output, {
+		maxLines: keepLines,
+		maxBytes: DEFAULT_MAX_BYTES / 2,
+	});
 	const omitted = lines.length - head.outputLines - tail.outputLines;
 	return `${head.content}\n[... ${omitted} lines truncated; full output: ${file} ...]\n${tail.content}`;
 }
@@ -84,7 +96,9 @@ function resolveTimeoutSeconds(timeout: number | undefined): number {
 		throw new Error("python: timeout must be greater than zero");
 	}
 	if (timeout > MAX_TIMEOUT_SECONDS) {
-		throw new Error(`python: timeout must be at most ${MAX_TIMEOUT_SECONDS} seconds`);
+		throw new Error(
+			`python: timeout must be at most ${MAX_TIMEOUT_SECONDS} seconds`,
+		);
 	}
 	return timeout;
 }
@@ -196,7 +210,8 @@ export default function (pi: ExtensionAPI) {
 			"combined stdout/stderr. By " +
 			"default each end of very long output is cut to 50 lines; raise keepLines " +
 			"to keep more per end.",
-		promptSnippet: "Execute Python 3 with no shell quoting and shared pip installs",
+		promptSnippet:
+			"Execute Python 3 with no shell quoting and shared pip installs",
 		promptGuidelines: [
 			"Use python to run Python snippets instead of piping source through bash, which requires shell quoting.",
 			"When python code fails with ModuleNotFoundError, call python again with pip naming the missing packages and retry_previous true instead of resending the code.",
@@ -235,8 +250,7 @@ export default function (pi: ExtensionAPI) {
 			),
 			timeout: Type.Optional(
 				Type.Number({
-					description:
-						`Timeout in seconds for the code run before it is killed; defaults to ${DEFAULT_TIMEOUT_SECONDS}. Must be a positive finite number. Does not bound \`pip\` installs.`,
+					description: `Timeout in seconds for the code run before it is killed; defaults to ${DEFAULT_TIMEOUT_SECONDS}. Must be a positive finite number. Does not bound \`pip\` installs.`,
 				}),
 			),
 		}),
@@ -255,7 +269,9 @@ export default function (pi: ExtensionAPI) {
 				source = lastCode;
 			} else {
 				if (params.code === undefined) {
-					throw new Error("python: code is required unless retry_previous is true");
+					throw new Error(
+						"python: code is required unless retry_previous is true",
+					);
 				}
 				source = params.code;
 			}
@@ -274,10 +290,17 @@ export default function (pi: ExtensionAPI) {
 			let installNote = "";
 			if (packages.length > 0) {
 				await ensureVenv(pi, venvDirectory, signal);
-				installNote = await installPackages(pi, venvDirectory, packages, signal);
+				installNote = await installPackages(
+					pi,
+					venvDirectory,
+					packages,
+					signal,
+				);
 			}
 			const venvInterpreter = venvPython(venvDirectory);
-			const interpreter = existsSync(venvInterpreter) ? venvInterpreter : "python3";
+			const interpreter = existsSync(venvInterpreter)
+				? venvInterpreter
+				: "python3";
 			const timeoutSeconds = resolveTimeoutSeconds(params.timeout);
 
 			const result = await pi.exec(interpreter, ["-c", source], {
@@ -287,21 +310,30 @@ export default function (pi: ExtensionAPI) {
 			});
 
 			const output = combinedOutput(result);
-			const sections = [installNote, output].filter((section) => section.length > 0);
+			const sections = [installNote, output].filter(
+				(section) => section.length > 0,
+			);
 			const text =
-				truncateOutput(sections.join("\n"), params.keepLines ?? DEFAULT_KEEP_LINES) ||
-				"(no output)";
+				truncateOutput(
+					sections.join("\n"),
+					params.keepLines ?? DEFAULT_KEEP_LINES,
+				) || "(no output)";
 
 			if (result.killed) {
 				if (signal?.aborted) {
 					throw new Error(`python: aborted\n\n${text}`);
 				}
-				throw new Error(`python: timed out after ${timeoutSeconds}s\n\n${text}`);
+				throw new Error(
+					`python: timed out after ${timeoutSeconds}s\n\n${text}`,
+				);
 			}
 			if (result.code !== 0) {
 				throw new Error(`${text}\n\n[exit code ${result.code}]`);
 			}
-			return { content: [{ type: "text", text }], details: { exitCode: result.code } };
+			return {
+				content: [{ type: "text", text }],
+				details: { exitCode: result.code },
+			};
 		},
 	});
 }

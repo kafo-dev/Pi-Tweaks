@@ -1,0 +1,33 @@
+#!/bin/sh
+# Pre-commit verification: formatting, linting, types, and leftover debug
+# prints. It never rewrites files: fix what it reports, then commit again.
+
+set -eu
+
+cd "$(git rev-parse --show-toplevel)"
+
+bin=node_modules/.bin
+if [ ! -x "$bin/biome" ] || [ ! -x "$bin/tsc" ]; then
+	printf '%s\n' 'pre-commit: dev tools missing; run `npm install` first' >&2
+	exit 1
+fi
+
+fail=0
+
+if ! "$bin/biome" ci .; then
+	fail=1
+fi
+
+if ! "$bin/tsc" --noEmit -p tsconfig.json; then
+	fail=1
+fi
+
+if out=$(git grep -nI '!D: ' -- . ':(exclude)scripts' 2>&1); then
+	printf '%s\n' 'pre-commit: remove debug prints (prefix `!D: `):' >&2
+	printf '%s\n' "$out" >&2
+	fail=1
+fi
+
+# No test suite is configured; this hook stops at the checks above.
+
+exit "$fail"

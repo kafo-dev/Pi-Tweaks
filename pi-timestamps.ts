@@ -73,14 +73,18 @@ let previousStampMs: number | null = null;
 /** Stamps `date` and remembers it as the previous stamp. */
 function nextStamp(date: Date): string {
 	const elapsedMs =
-		previousStampMs === null ? null : Math.max(0, date.getTime() - previousStampMs);
+		previousStampMs === null
+			? null
+			: Math.max(0, date.getTime() - previousStampMs);
 	previousStampMs = date.getTime();
 	return stamp(date, elapsedMs);
 }
 
 /** Appends a stamp to `text`, unless it already ends in one. */
 function withStamp(text: string): string {
-	return TRAILING_STAMP.test(`\n${text}`) ? text : `${text}\n\n${nextStamp(new Date())}`;
+	return TRAILING_STAMP.test(`\n${text}`)
+		? text
+		: `${text}\n\n${nextStamp(new Date())}`;
 }
 
 /** `[2026-Sep-17 16:52 Thu +1m30s]` — what the model reads. */
@@ -108,7 +112,9 @@ if (displayed !== "hello") {
 }
 const inlineStamp = `the stamp ${stamp(new Date(), null)} stays put`;
 if (inlineStamp.replace(DISPLAY_STAMP, "") !== inlineStamp) {
-	throw new Error("pi-timestamps: DISPLAY_STAMP eats a stamp quoted mid-answer");
+	throw new Error(
+		"pi-timestamps: DISPLAY_STAMP eats a stamp quoted mid-answer",
+	);
 }
 const wrapped = `hello\n\n<!-- ${stamp(new Date(), 1000)} -->`;
 if (wrapped.replace(DISPLAY_STAMP, "") !== "hello") {
@@ -121,14 +127,18 @@ for (const [ms, want] of [
 	[60_000, "1m0s"],
 	[3_723_000, "1h2m3s"],
 ] as const) {
-	if (goDuration(ms) !== want) throw new Error(`pi-timestamps: goDuration(${ms}) !== ${want}`);
+	if (goDuration(ms) !== want)
+		throw new Error(`pi-timestamps: goDuration(${ms}) !== ${want}`);
 	if (!TRAILING_STAMP.test(`\n${stamp(new Date(), ms)}`)) {
 		throw new Error(`pi-timestamps: TRAILING_STAMP does not match +${want}`);
 	}
 }
 
 /** Appends to the last text block. Returns null when there is nothing to stamp. */
-function appendToLastText(content: unknown, suffix: () => string): unknown[] | null {
+function appendToLastText(
+	content: unknown,
+	suffix: () => string,
+): unknown[] | null {
 	if (!Array.isArray(content)) return null;
 
 	const blocks = content as Array<Record<string, unknown>>;
@@ -146,7 +156,9 @@ function appendToLastText(content: unknown, suffix: () => string): unknown[] | n
 
 export default function timestamps(pi: ExtensionAPI) {
 	// Hide the stamp from the reader: the session and the model context keep it.
-	pi.registerMarkdownTransformer((markdown) => markdown.replace(DISPLAY_STAMP, ""));
+	pi.registerMarkdownTransformer((markdown) =>
+		markdown.replace(DISPLAY_STAMP, ""),
+	);
 
 	// A new session starts at zero, so the first stamp has no delta and the model
 	// can tell a session boundary from a fresh start.
@@ -164,14 +176,6 @@ export default function timestamps(pi: ExtensionAPI) {
 		if (event.message.stopReason === "toolUse") return;
 
 		const content = event.message.content;
-
-		if (typeof content === "string") {
-			if (TRAILING_STAMP.test(content)) return;
-			return {
-				message: { ...event.message, content: `${content}\n\n${nextStamp(new Date())}` },
-			};
-		}
-
 		const blocks = appendToLastText(content, () => nextStamp(new Date()));
 		if (!blocks) return;
 		return { message: { ...event.message, content: blocks as typeof content } };

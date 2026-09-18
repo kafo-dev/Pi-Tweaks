@@ -15,14 +15,14 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 export default function (pi: ExtensionAPI) {
 	pi.registerCommand("stop", {
 		description: "Abort the current turn (same as Escape)",
-		handler: (_args, ctx) => {
+		handler: async (_args, ctx) => {
 			if (ctx.isIdle()) {
 				ctx.ui.notify("Nothing is running", "info");
 				return;
 			}
 			// Emit before `ctx.abort()` so pi-notify has the flag when the turn
 			// settles.
-			pi.events.emit("turn-aborted");
+			pi.events.emit("turn-aborted", undefined);
 			ctx.abort();
 			ctx.ui.notify("Stopping", "info");
 		},

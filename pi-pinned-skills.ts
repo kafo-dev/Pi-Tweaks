@@ -21,7 +21,12 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CONFIG_DIR_NAME, getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import {
+	CONFIG_DIR_NAME,
+	type ExtensionAPI,
+	type ExtensionContext,
+	getAgentDir,
+} from "@earendil-works/pi-coding-agent";
 
 const CONFIG_FILE = "pinned-skills.json";
 
@@ -80,7 +85,10 @@ function build(
 		parts.push(`<skill name="${name}">\n${body}\n</skill>`);
 	}
 
-	const text = parts.length > 0 ? `<pinned_skills>\n${parts.join("\n\n")}\n</pinned_skills>` : "";
+	const text =
+		parts.length > 0
+			? `<pinned_skills>\n${parts.join("\n\n")}\n</pinned_skills>`
+			: "";
 	return { text, missing };
 }
 
@@ -113,7 +121,10 @@ export default function pinnedSkills(pi: ExtensionAPI) {
 				return;
 			}
 
-			const { text, missing } = build(ctx.getSystemPromptOptions().skills ?? [], names);
+			const { text, missing } = build(
+				ctx.getSystemPromptOptions().skills ?? [],
+				names,
+			);
 			const lines = [
 				`config: ${path}`,
 				`pinned: ${names.join(", ") || "none"}`,
