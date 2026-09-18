@@ -155,6 +155,56 @@ If Chrome is already serving `:9222`, the start script reuses it and cannot
 change its profile. A stale instance left on Guest (or on the picker) keeps
 failing: close that Chrome, then start again with the intended profile.
 
+## Extensions
+
+Chromium loads externally provisioned extensions from the agent user-data-dir:
+a descriptor at `~/.cache/browser-tools/External Extensions/<id>.json` points at
+a CRX kept at `~/.cache/browser-tools-extensions/<id>.crx`. Provision one with:
+
+```bash
+{baseDir}/browser-install-extension.js --id <extension-id>     # download from the Web Store
+{baseDir}/browser-install-extension.js --crx ./some-extension.crx   # local CRX file
+{baseDir}/browser-install-extension.js --id <extension-id> --version <v>
+```
+
+The script reads the id and version from the CRX, stores the CRX as
+`~/.cache/browser-tools-extensions/<id>.crx`, writes the descriptor, and prints
+the follow-up: start (or restart) Chromium with `browser-start-linux.js`.
+
+**Stop the browser first.** Chromium owns its profile's `Preferences` while it
+runs, so the script refuses if the agent browser is up. Stop just the agent
+instance without matching the invoking shell:
+
+```bash
+pkill -f "[u]ser-data-dir=$HOME/.cache/browser-tools"
+```
+
+### Reinstalling is one-shot
+
+Once Chromium has registered an external extension, it trusts
+`extensions.settings.<id>` in `Pi-Coding-Agent-Dedicated-Profile/Preferences`
+and does not re-read the CRX. `browser-install-extension.js` deletes that entry
+before writing the descriptor, so a re-run plus relaunch reinstalls. To recover
+by hand: stop Chromium, delete `extensions.settings.<id>` from `Preferences`
+(and from `Secure Preferences` when it is there), then start Chromium again.
+Extensions installed this way never auto-update; update by re-running the script
+with the same `--id` against a newer CRX.
+
+### Manifest V2 is gone
+
+Chrome/Chromium 139 removed Manifest V2 support, so a CRX for an MV2 extension
+will not load on a current Chromium. Provision an MV3 build instead.
+
+### Seeding keeps provisioned extensions
+
+`browser-start-linux.js --profile` refreshes the seeded user profiles with
+`rsync --delete`, which would drop `External Extensions/` (a real profile has no
+such directory) and make Chromium uninstall the extensions on the next launch.
+The refresh excludes that directory, so provisioned extensions survive seeding.
+
+The script uses Chromium's `external_crx` mechanism rather than
+`--load-extension`; see [PATCHES.md](PATCHES.md) for the comparison.
+
 ## Navigate
 
 ```bash

@@ -107,3 +107,34 @@ extension provisioned there.
 `External Extensions` is now excluded from the seeded refresh, alongside
 `SingletonLock`/`SingletonSocket`/`SingletonCookie` and the agent's own
 `Pi-Coding-Agent-Dedicated-Profile` directory.
+
+## Patch 6 — CRX extension provisioning
+
+**File:** [`browser-install-extension.js`](browser-install-extension.js) (added)
+
+Chromium's external-extension mechanism is the way to install an extension into
+the agent profile without a developer-mode prompt. The script wraps it:
+
+- `--id <extension-id>` downloads the CRX from
+  `https://clients2.google.com/service/update2/crx?response=redirect&prodversion=<chrome-major>&acceptformat=crx2,crx3&x=id%3D<id>%26uc`,
+  using the detected Chromium major version; `--crx <file>` uses a local CRX
+  instead.
+- Reads the extension id from the CRX3 `signed_header_data.crx_id` field (for
+  CRX2, the first 16 bytes of SHA-256 over the inline public key) and the
+  version from the CRX's `manifest.json`, so `--crx` alone is enough;
+  `--version` overrides a version that cannot be read.
+- Stores the CRX at `~/.cache/browser-tools-extensions/<id>.crx` and writes
+  `~/.cache/browser-tools/External Extensions/<id>.json` with `external_crx`
+  and `external_version`.
+- Deletes `extensions.settings.<id>` from the agent profile's `Preferences`
+  (and `Secure Preferences` when the id is there) before the next launch,
+  because an external install is one-shot and Chromium would otherwise keep the
+  already-registered copy.
+- Refuses while a Chromium owns the agent user-data-dir. It resolves
+  `SingletonLock` (`<host>-<pid>`) and checks `/proc/<pid>/cmdline`; matching
+  argv with `pgrep -f --user-data-dir=...` would match the invoking shell.
+
+Rejected alternative: loading the unpacked CRX with `--load-extension` plus
+`--disable-features=DisableLoadExtensionCommandLineSwitch`. It does not persist
+across launches, needs a launcher flag every run, and may show a developer-mode
+prompt; the `external_crx` mechanism used here does persist.

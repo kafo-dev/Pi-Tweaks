@@ -31,6 +31,15 @@ See [PATCHES.md](PATCHES.md) for details. In short:
 3. **`SKILL.md` fixes** — corrected setup path, documented the Linux script,
    and added profile-selection guidance (prefer the cached profile; on a fresh
    agent profile ask before seeding; list and ask before using another).
+4. **Packaged as a pi package** — root `package.json`/`.gitignore`, hoisted
+   dependencies, and an `(ISC AND MIT)` license.
+5. **Keep provisioned extensions across `--profile`** — the seeded refresh
+   excludes `External Extensions/`, so a CRX installed there is not dropped.
+6. **CRX extension provisioning** —
+   [`browser-install-extension.js`](browser-install-extension.js) downloads or
+   copies a CRX into `~/.cache/browser-tools-extensions/` and registers it
+   through Chromium's `External Extensions/` directory; see
+   [`SKILL.md`](SKILL.md#extensions).
 
 ## Install into pi
 
@@ -63,6 +72,7 @@ npm install          # scripts use puppeteer-core + the system browser
 # Linux
 ./browser-start-linux.js [--profile] [--profile-directory <name>]
 ./browser-start-linux.js --list-profiles
+./browser-install-extension.js --id <extension-id>
 
 ./browser-nav.js https://example.com [--new] [--reload]
 ./browser-eval.js 'document.title'
