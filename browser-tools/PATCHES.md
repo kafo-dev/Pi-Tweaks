@@ -92,3 +92,18 @@ The full diff is ~87 changed lines against upstream; regenerate it with the
   `puppeteer-core` against the system browser. Kept: `puppeteer-core`,
   `@mozilla/readability`, `jsdom`, `turndown`, `turndown-plugin-gfm`, `cheerio`.
 - The package license is `(ISC AND MIT)` (root ISC + `browser-tools/` MIT).
+
+## Patch 5 — keep agent-provisioned extensions across `--profile`
+
+**File:** [`browser-start-linux.js`](browser-start-linux.js)
+
+`--profile` seeds the agent user-data-dir with `rsync -a --delete`. Chromium
+reads the agent's own extension-provisioning directory, `External Extensions/`,
+from the user-data-dir on every launch, and uninstalls an externally installed
+extension once its entry disappears. A real Chromium profile does not carry that
+directory, so `--delete` removed it and a seeded refresh silently dropped every
+extension provisioned there.
+
+`External Extensions` is now excluded from the seeded refresh, alongside
+`SingletonLock`/`SingletonSocket`/`SingletonCookie` and the agent's own
+`Pi-Coding-Agent-Dedicated-Profile` directory.

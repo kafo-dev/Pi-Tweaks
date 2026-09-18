@@ -231,12 +231,17 @@ if (useProfile) {
 	}
 	const previousState = readLocalState();
 	console.log(`Refreshing seeded profiles from ${source} (agent's own profile is kept) ...`);
+	// 'External Extensions' is kept as well: it is the agent's own extension
+	// provisioning directory (external_crx/external_update_url files), and
+	// --delete would otherwise remove it and Chrome would uninstall those
+	// extensions on the next launch.
 	execSync(
 		`rsync -a --delete \
 			--exclude='SingletonLock' \
 			--exclude='SingletonSocket' \
 			--exclude='SingletonCookie' \
 			--exclude='${AGENT_DEFAULT_PROFILE}' \
+			--exclude='External Extensions' \
 			--exclude='*/Sessions/*' \
 			--exclude='*/Current Session' \
 			--exclude='*/Current Tabs' \
