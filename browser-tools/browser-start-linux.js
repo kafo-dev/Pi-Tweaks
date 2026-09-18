@@ -6,32 +6,43 @@
 //   - Auto-detects a Chromium/Chrome binary (or honors $CHROME_BIN).
 //   - Uses a dedicated, persistent profile for the agent at
 //     ~/.cache/browser-tools (never your live profile directory).
-//   - Always opens a named profile inside that user-data-dir (default
-//     "Default"), so Chrome never shows the profile picker and never falls
-//     back to the unusable Guest profile.
-//   - With --profile, seeds that dedicated profile from your real Chromium
-//     profile; otherwise it uses whatever the agent profile already has.
+//   - Always opens a named profile inside that user-data-dir, the agent's own
+//     "Pi-Coding-Agent-Dedicated-Profile" by default, so Chrome never shows the
+//     profile picker and never falls back to the unusable Guest profile.
+//   - With --profile, refreshes the seeded user profiles from your real Chromium
+//     profile (rsync --delete) while the agent's own dedicated profile is never
+//     touched. Otherwise it uses whatever the agent profile has.
 //
 // Usage:
-//   browser-start-linux.js                       # Default agent profile
-//   browser-start-linux.js --profile             # Seed dedicated profile from yours
+//   browser-start-linux.js                       # Agent's own dedicated profile
+//   browser-start-linux.js --profile             # Refresh seeded profiles from yours
 //   browser-start-linux.js --list-profiles       # List profiles inside the agent profile
 //   browser-start-linux.js --profile-directory "Profile 1"
+//   browser-start-linux.js --class "Pi-Agent"    # Custom window class (Wayland app_id)
 //
 // Environment:
 //   CHROME_BIN          Override the browser binary
 //   BROWSER_PROFILE     Override the source profile dir used with --profile
-//   BROWSER_PROFILE_DIR Override the agent profile directory (default: Default)
+//   BROWSER_PROFILE_DIR Override the agent profile directory (default: Pi-Coding-Agent-Dedicated-Profile)
+//   BROWSER_APP_CLASS   Linux window class (Wayland app_id / X11 WM_CLASS); empty disables (default: Pi-Coding-Agent-Control-chromium)
 
 import { spawn, execSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import puppeteer from "puppeteer-core";
 
 let useProfile = false;
 let listProfiles = false;
-let profileDir = process.env.BROWSER_PROFILE_DIR || "Default";
+
+// Name of the agent's own profile inside the agent user-data-dir. Chosen so it
+// is unlikely to exist in a seeded user profile, so seeding never collides
+// with or overwrites the agent's own data.
+const AGENT_DEFAULT_PROFILE = "Pi-Coding-Agent-Dedicated-Profile";
+const AGENT_PROFILE_NAME = "Pi Coding Agent";
+const AGENT_DEFAULT_CLASS = "Pi-Coding-Agent-Control-chromium";
+let profileDir = process.env.BROWSER_PROFILE_DIR || AGENT_DEFAULT_PROFILE;
+let appClass = process.env.BROWSER_APP_CLASS ?? AGENT_DEFAULT_CLASS;
 
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) {
@@ -44,18 +55,23 @@ for (let i = 0; i < argv.length; i++) {
 		profileDir = argv[++i];
 	} else if (arg.startsWith("--profile-directory=")) {
 		profileDir = arg.slice("--profile-directory=".length);
+	} else if (arg === "--class") {
+		appClass = argv[++i];
+	} else if (arg.startsWith("--class=")) {
+		appClass = arg.slice("--class=".length);
 	} else {
-		console.log("Usage: browser-start-linux.js [--profile] [--profile-directory <name>] [--list-profiles]");
+		console.log("Usage: browser-start-linux.js [--profile] [--profile-directory <name>] [--class <name>] [--list-profiles]");
 		console.log("\nOptions:");
-		console.log("  --profile                    Seed the dedicated agent profile from your real browser profile");
-		console.log("  --profile-directory <name>   Profile inside ~/.cache/browser-tools to open (default: Default)");
+		console.log("  --profile                    Refresh seeded profiles from your real browser profile (agent's own profile is kept)");
+		console.log("  --profile-directory <name>   Profile inside ~/.cache/browser-tools to open (default: Pi-Coding-Agent-Dedicated-Profile)");
+		console.log("  --class <name>               Linux window class: Wayland app_id / X11 WM_CLASS (default: Pi-Coding-Agent-Control-chromium)");
 		console.log("  --list-profiles              List the profiles available in the agent profile");
 		process.exit(1);
 	}
 }
 
 if (!profileDir) {
-	console.error("✗ --profile-directory needs a value (the directory name, e.g. Default or \"Profile 1\").");
+	console.error("✗ --profile-directory needs a value (the directory name, e.g. \"Profile 1\").");
 	process.exit(1);
 }
 
@@ -79,6 +95,50 @@ function readAgentProfiles() {
 	} catch {
 		return { lastUsed: null, profiles: {} };
 	}
+}
+
+// Read and parse the agent profile's Local State, or null when absent/invalid.
+function readLocalState() {
+	const localState = join(AGENT_PROFILE, "Local State");
+	if (!existsSync(localState)) return null;
+	try {
+		return JSON.parse(readFileSync(localState, "utf8"));
+	} catch {
+		return null;
+	}
+}
+
+// rsync --delete replaces the agent's Local State with the source's, which drops
+// the agent's own profile registration. Re-register the dedicated profile (its
+// directory is excluded from the rsync) and keep the agent's top-level Local
+// State, so the agent's existing profile keeps its cookie-encryption key.
+function mergeSeededLocalState(previousState) {
+	const seeded = readLocalState() ?? {};
+	const base = previousState ?? {};
+	const seededProfile = seeded.profile ?? {};
+	const baseProfile = base.profile ?? {};
+	const infoCache = { ...(seededProfile.info_cache ?? {}), ...(baseProfile.info_cache ?? {}) };
+	if (!infoCache[AGENT_DEFAULT_PROFILE]) {
+		infoCache[AGENT_DEFAULT_PROFILE] = { name: AGENT_PROFILE_NAME, is_using_default_name: false };
+	}
+	const merged = {
+		...seeded,
+		...base,
+		profile: {
+			...seededProfile,
+			...baseProfile,
+			info_cache: infoCache,
+			profiles_order: [
+				...new Set([
+					...(baseProfile.profiles_order ?? []),
+					...(seededProfile.profiles_order ?? []),
+					AGENT_DEFAULT_PROFILE,
+				]),
+			],
+			last_used: baseProfile.last_used ?? seededProfile.last_used ?? AGENT_DEFAULT_PROFILE,
+		},
+	};
+	writeFileSync(join(AGENT_PROFILE, "Local State"), JSON.stringify(merged));
 }
 
 function printAgentProfiles() {
@@ -169,12 +229,14 @@ if (useProfile) {
 		console.error("✗ Could not find a Chrome/Chromium profile under ~/.config. Set $BROWSER_PROFILE.");
 		process.exit(1);
 	}
-	console.log(`Syncing profile from ${source} ...`);
+	const previousState = readLocalState();
+	console.log(`Refreshing seeded profiles from ${source} (agent's own profile is kept) ...`);
 	execSync(
 		`rsync -a --delete \
 			--exclude='SingletonLock' \
 			--exclude='SingletonSocket' \
 			--exclude='SingletonCookie' \
+			--exclude='${AGENT_DEFAULT_PROFILE}' \
 			--exclude='*/Sessions/*' \
 			--exclude='*/Current Session' \
 			--exclude='*/Current Tabs' \
@@ -183,6 +245,7 @@ if (useProfile) {
 			"${source}/" "${AGENT_PROFILE}/"`,
 		{ stdio: "pipe" },
 	);
+	mergeSeededLocalState(previousState);
 }
 
 // Guest windows refuse Target.createTarget over CDP, which breaks --new.
@@ -191,26 +254,30 @@ if (profileDir === "Guest Profile") {
 	process.exit(1);
 }
 
-// Refuse an unknown profile instead of letting Chrome show its picker.
+// Refuse an unknown profile instead of letting Chrome show its picker. The
+// agent's own dedicated profile is always allowed: Chrome creates and registers
+// it on first launch, and a seed from a real profile would not list it.
 const { profiles } = readAgentProfiles();
 const knownDirs = Object.keys(profiles);
-if (knownDirs.length > 0 && !knownDirs.includes(profileDir)) {
+if (knownDirs.length > 0 && !knownDirs.includes(profileDir) && profileDir !== AGENT_DEFAULT_PROFILE) {
 	console.error(`✗ No profile "${profileDir}" in ${AGENT_PROFILE}.`);
 	printAgentProfiles();
 	process.exit(1);
 }
 
-spawn(
-	chrome,
-	[
-		"--remote-debugging-port=9222",
-		`--user-data-dir=${AGENT_PROFILE}`,
-		`--profile-directory=${profileDir}`,
-		"--no-first-run",
-		"--no-default-browser-check",
-	],
-	{ detached: true, stdio: "ignore" },
-).unref();
+const chromeArgs = [
+	"--remote-debugging-port=9222",
+	`--user-data-dir=${AGENT_PROFILE}`,
+	`--profile-directory=${profileDir}`,
+	"--no-first-run",
+	"--no-default-browser-check",
+	"--hide-crash-restore-bubble",
+];
+// --class sets the Wayland toplevel app_id (and the X11 WM_CLASS). Empty
+// disables it; by default the agent's own class is used so its window is
+// identifiable and grouped apart from a normal Chromium.
+if (appClass) chromeArgs.push(`--class=${appClass}`);
+spawn(chrome, chromeArgs, { detached: true, stdio: "ignore" }).unref();
 
 let connected = false;
 for (let i = 0; i < 30; i++) {
@@ -231,6 +298,6 @@ if (!connected) {
 
 console.log(
 	`✓ Chrome started on :9222 using agent profile: ${AGENT_PROFILE} (profile "${profileDir}")${
-		useProfile ? " (seeded from your profile)" : ""
+		useProfile ? " (refreshed from your profile)" : ""
 	}`,
 );

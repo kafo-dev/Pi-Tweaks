@@ -87,32 +87,39 @@ macOS (upstream script):
 Linux (this fork):
 
 ```bash
-{baseDir}/browser-start-linux.js                       # Default agent profile
-{baseDir}/browser-start-linux.js --profile             # Seed it from a real profile
+{baseDir}/browser-start-linux.js                       # Agent's own dedicated profile
+{baseDir}/browser-start-linux.js --profile             # Refresh seeded profiles from a real profile
 {baseDir}/browser-start-linux.js --list-profiles       # List profiles in the agent profile
 {baseDir}/browser-start-linux.js --profile-directory "Profile 1"
+{baseDir}/browser-start-linux.js --class "Pi-Agent"    # Custom window class (Wayland app_id)
 ```
 
 Launch Chrome with remote debugging on `:9222`. The Linux script auto-detects
 Chromium (override with `$CHROME_BIN`) and uses a dedicated, persistent
 user-data-dir at `~/.cache/browser-tools`, separate from your normal browser.
-`--profile` seeds that user-data-dir from the user's real browser profile; it
-does not change which profile the agent opens.
+`--profile` refreshes the seeded user profiles from the user's real browser
+profile on each run; it never touches the agent's own
+`Pi-Coding-Agent-Dedicated-Profile` and does not change which profile the agent
+opens. `--class <name>` (or `$BROWSER_APP_CLASS`) gives the window a custom Linux
+class — the Wayland toplevel `app_id` and the X11 `WM_CLASS` — defaulting to
+`Pi-Coding-Agent-Control-chromium`; an empty value disables it.
 
 ### Always use the cached agent profile
 
-By default the script opens the `Default` profile inside
-`~/.cache/browser-tools` and passes `--profile-directory` explicitly. **Prefer
-this profile** for everything, and only switch when the user explicitly asks
-for a different one.
+By default the script opens the agent's own profile,
+`Pi-Coding-Agent-Dedicated-Profile`, inside `~/.cache/browser-tools` and
+passes `--profile-directory` explicitly. **Prefer this profile** for everything,
+and only switch when the user explicitly asks for a different one.
 
 #### First run: ask before seeding
 
 If `~/.cache/browser-tools` does not exist yet, the agent profile is fresh.
 Do **not** silently pass `--profile`: seeding copies the user's real browser
-profile — cookies, logins, extensions and all — into the agent profile. They
-may want the agent to stay separate and log in there on its own, or to seed
-from a different profile than the one that is auto-detected.
+profile — cookies, logins, extensions and all — into the agent user-data-dir,
+refreshing the seeded profiles on each run while leaving the agent's own
+dedicated profile untouched. They may want the agent to stay separate and log
+in there on its own, or to seed from a different profile than the one that is
+auto-detected.
 
 Ask the user which they want before starting:
 
@@ -120,9 +127,11 @@ Ask the user which they want before starting:
   is empty and the user logs in to it separately.
 - **Seed from a real profile** — run
   `{baseDir}/browser-start-linux.js --profile`. The source browser is
-  auto-detected; set `$BROWSER_PROFILE` to pick another one. To open a profile
-  other than `Default` inside the seeded copy, use `--profile-directory`
-  (list the options first).
+  auto-detected; set `$BROWSER_PROFILE` to pick another one. Each run refreshes
+  the seeded user profiles to match the source while the agent's own dedicated
+  profile keeps its cookies and logins. To open a profile other than the agent's
+  own profile inside the seeded copy, use `--profile-directory` (list the
+  options first).
 
 Use `{baseDir}/browser-start-linux.js --list-profiles` to see what already
 exists; "(none yet)" means the agent profile has never been launched.

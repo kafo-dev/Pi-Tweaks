@@ -19,9 +19,12 @@ See [PATCHES.md](PATCHES.md) for details. In short:
 
 1. **Linux support** — [`browser-start-linux.js`](browser-start-linux.js):
    auto-detects Chromium and starts a dedicated, persistent agent profile at
-   `~/.cache/browser-tools` (`--profile` seeds it from the real profile). It
-   opens the `Default` profile there by default and refuses Guest, so Chrome
-   never shows the profile picker; `--list-profiles` lists the alternatives.
+   `~/.cache/browser-tools` (`--profile` refreshes the seeded user profiles
+   from the real profile while keeping the agent's own). It opens its own
+   dedicated profile there by default and refuses Guest, so Chrome never shows
+   the profile picker; `--list-profiles` lists the alternatives. The window
+   class defaults to `Pi-Coding-Agent-Control-chromium` on Wayland (`app_id`)
+   and X11 (`WM_CLASS`), overridable with `--class`.
 2. **Output / context discipline** — folded into [`SKILL.md`](SKILL.md)
    (redirect tool output to a file and query it, return the smallest useful
    value, avoid needless screenshots, use standard filters).

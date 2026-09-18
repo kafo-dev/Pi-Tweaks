@@ -20,19 +20,27 @@ The added script:
 
 - auto-detects a Chromium/Chrome binary (override with `$CHROME_BIN`);
 - starts a **dedicated, persistent agent profile** at `~/.cache/browser-tools`,
-  never the user's live profile;
-- with `--profile`, seeds that profile via `rsync` from the real Chromium
-  profile (auto-detected; `$BROWSER_PROFILE` override), excluding
-  `SingletonLock`/`SingletonSocket`/`SingletonCookie` and session/tab files;
-- always passes `--profile-directory` (default `Default`, override with
-  `--profile-directory <name>` or `$BROWSER_PROFILE_DIR`) so Chrome never shows
-  the profile picker, and refuses `Guest Profile`, whose windows cannot open
-  new tabs over CDP;
+  never the user's live profile, and opens its own
+  `Pi-Coding-Agent-Dedicated-Profile` profile there by default;
+- with `--profile`, refreshes the seeded user profiles from the real Chromium
+  profile via `rsync --delete` (auto-detected; `$BROWSER_PROFILE` override),
+  excluding `SingletonLock`/`SingletonSocket`/`SingletonCookie`, session/tab
+  files and the agent's own `Pi-Coding-Agent-Dedicated-Profile` directory, then
+  re-registers that profile in `Local State` (rsync replaces it) while keeping
+  the agent's top-level `Local State`, including its cookie-encryption key;
+- always passes `--profile-directory` (default
+  `Pi-Coding-Agent-Dedicated-Profile`, override with `--profile-directory
+  <name>` or `$BROWSER_PROFILE_DIR`) so Chrome never shows the profile picker,
+  and refuses `Guest Profile`, whose windows cannot open new tabs over CDP;
 - `--list-profiles` prints the profiles and their display names from
   `Local State`, so a different profile can be chosen without the picker;
 - reuses an existing `:9222` if one is already serving CDP;
+- sets the Linux window class via `--class` (or `$BROWSER_APP_CLASS`) — the
+  Wayland toplevel `app_id` and the X11 `WM_CLASS` — defaulting to
+  `Pi-Coding-Agent-Control-chromium`; an empty value disables it;
 - launches detached with `--remote-debugging-port=9222 --user-data-dir=<agent>
-  --profile-directory=<profile> --no-first-run --no-default-browser-check`.
+  --profile-directory=<profile> --no-first-run --no-default-browser-check
+  --hide-crash-restore-bubble`.
 
 ## Patch 2 — Output / context discipline
 
@@ -58,7 +66,7 @@ It also documents the `chrome-extension://` → `✗ No active tab found` gotcha
 - Fixed the setup path: `cd {baseDir}/browser-tools` → `cd {baseDir}`.
 - Documented the Linux start script alongside the macOS one.
 - Added the Output Discipline section (Patch 2).
-- Added profile guidance: prefer the cached `Default` agent profile, list the
+- Added profile guidance: prefer the agent's own dedicated profile, list the
   profiles and ask the user before opening a different one, and never Guest.
   On a fresh agent profile, ask whether to start clean or seed from one of the
   user's real profiles before launching.
