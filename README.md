@@ -28,7 +28,6 @@ extension's settings and an `enabled` switch:
 ```json
 {
   "pi-bash-timeout": { "enabled": true, "timeoutSeconds": 10 },
-  "pi-python": { "enabled": true, "timeoutSeconds": 10, "keepLines": 50 },
   "pi-notify": {
     "enabled": true,
     "backend": "termcodes",
@@ -52,7 +51,6 @@ start (or `/reload`).
 | Section | Settings |
 |---------|----------|
 | `pi-bash-timeout` | `timeoutSeconds` (default 10) |
-| `pi-python` | `timeoutSeconds` (default 10), `keepLines` (default 50) |
 | `pi-notify` | `backend`, `phone`, `device`; `/notify` writes them back here |
 | `pi-pinned-skills` | `skills`: names whose full text is pinned into the system prompt |
 | `pi-compaction-prompt` | `promptFile`: path to the Markdown summary prompt |
@@ -78,13 +76,13 @@ that lives with the rest of the extension's settings.
 | [`pi-pinned-skills.ts`](pi-pinned-skills.ts) | Extension that appends the full text of skills named in `pi-pinned-skills.skills` to the system prompt on every turn, so they apply without the model deciding to read them. The block is deterministic, which keeps it inside the provider's cached prefix. `/pinned-skills` reports what resolved. |
 | [`pi-compaction-prompt.ts`](pi-compaction-prompt.ts) | Extension that replaces pi's compaction prompt with the body of a Markdown file named by `pi-compaction-prompt.promptFile`. The previous summary, `/compact` instructions, and the conversation are appended, and the read/modified file lists pi normally adds are kept. Unset means pi's default compaction. |
 | [`pi-exit.ts`](pi-exit.ts) | Extension that adds `/exit` as an alias for pi's built-in `/quit`. |
-| [`pi-python.ts`](pi-python.ts) | Extension that adds a `python` tool: raw Python 3 source is passed as one argv entry, so no shell quoting, escaping, or code fences are needed. A `pip` field installs packages into a virtual environment shared by every pi session (`python-venv` inside pi's agent directory) before the code runs, and `retry_previous` re-runs the last program so the model can install a missing package without resending its code. A `cwd` field runs the code in another directory; a relative path resolves against the session working directory. The code run is killed after `pi-python.timeoutSeconds` (10) unless the `timeout` field (in seconds) says otherwise. |
 | [`pi-bash-timeout.ts`](pi-bash-timeout.ts) | Extension that fills in the built-in `bash` tool's `timeout` parameter (in seconds) when the model omits it, so a hung command cannot stall a turn. An explicit model value wins. The default is `pi-bash-timeout.timeoutSeconds` (10). |
 | [`pi-stop.ts`](pi-stop.ts) | Extension that adds `/stop`, which aborts the running turn — the same abort as Escape. It works while the agent is streaming, because pi dispatches commands before it queues steering input. |
 | [`pi-timestamps.ts`](pi-timestamps.ts) | Extension that appends a date and time stamp to each sent prompt and to the final answer of a turn, so the model can see when it last spoke and when you last wrote. Each stamp carries the gap since the previous one (`+1m30s`), and the counter resets at each session start. The stamp lives in the session and the model context but is hidden from the rendered transcript. Messages that stopped to call a tool are skipped. |
 | [`browser-tools/`](browser-tools/) | CDP browser-automation skill. **Read [`browser-tools/NOTICE.md`](browser-tools/NOTICE.md)** for attribution and licensing before using or redistributing. |
 | [`web-tools/`](web-tools/) | Free, keyless web search through Exa's hosted MCP server, plus `web-read`, a local POSIX `sh` reader that turns a URL into LLM-friendly markdown. No API key. See its [README](web-tools/README.md). |
 | [`Extras/`](Extras/) | `bwrap` sandbox wrapper for the `pi` CLI. See its [README](Extras/README.md). |
+| [`.archived/`](.archived/) | Tools retired from the package, kept for reference. See its [README](.archived/README.md). |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to contribute — commit message style, etc. |
 | [`LICENSE`](LICENSE) | ISC — this repository's own files. |
 

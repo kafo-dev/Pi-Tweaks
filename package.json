@@ -18,7 +18,6 @@
 			"./pi-compaction-prompt.ts",
 			"./pi-exit.ts",
 			"./pi-pinned-skills.ts",
-			"./pi-python.ts",
 			"./pi-stop.ts",
 			"./pi-timestamps.ts"
 		],

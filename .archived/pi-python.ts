@@ -40,7 +40,7 @@ import {
 	isExtensionEnabled,
 	numberValue,
 	readSection,
-} from "./pi-tweaks-config";
+} from "../pi-tweaks-config";
 
 const EXTENSION = "pi-python";
 const DEFAULT_KEEP_LINES = 50; // when pi-tweaks.json says nothing
