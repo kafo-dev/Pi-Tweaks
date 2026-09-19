@@ -46,6 +46,9 @@ Starting from `$HOME` or an ancestor of it would expose all of `$HOME` if the
 project directory were bound read-write. Instead the project directory stays
 read-only for that run, and the agent is told through an appended
 system-prompt note that files it needs to write belong in the scratchpad.
+Management subcommands (`install`, `remove`, `update`, `list`, `config`,
+`auth`) start no agent session and are passed through unchanged: pi recognizes
+them only as the first argument, so no note can be inserted before one.
 
 ### Scratchpad
 
