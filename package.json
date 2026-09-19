@@ -18,7 +18,8 @@
 			"./pi-compaction-prompt.ts",
 			"./pi-exit.ts",
 			"./pi-pinned-skills.ts",
-			"./pi-stop.ts"
+			"./pi-stop.ts",
+			"./Experiment/minimal-tools.ts"
 		],
 		"skills": [
 			"./browser-tools",

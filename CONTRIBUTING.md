@@ -71,3 +71,6 @@ uses. The override can go once cheerio depends on v1 itself.
   limits, licensing) in its own Markdown files, not in the root README.
 - `Extras/` is its own subproject. Keep wrapper behavior and limitations in
   `Extras/README.md`.
+- `Experiment/` holds experimental extensions. They are listed in
+  `pi.extensions` but default off in `pi-tweaks.json`. Keep each experiment's
+  hypothesis and usage in `Experiment/README.md`.

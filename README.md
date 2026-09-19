@@ -14,9 +14,11 @@ pi install /path/to/Pi-Tweaks
 The `pi` manifest in [`package.json`](package.json) declares the resources; pi
 installs the dependencies and discovers each skill's `SKILL.md` plus every
 extension listed in `pi.extensions`. The skills load on demand and are available
-as `/skill:browser-tools` and `/skill:web-tools`; the extensions are always
-loaded. `pi-notify` notifies on the terminal out of the box, while its phone leg
-stays off until you configure it.
+as `/skill:browser-tools` and `/skill:web-tools`; the packaged extensions are
+loaded at startup. `pi-notify` notifies on the terminal out of the box, while
+its phone leg stays off until you configure it. The experimental extension in
+`Experiment/` is loaded too, but registers nothing until
+`experiment-minimal-tools.enabled` is `true` in `pi-tweaks.json`.
 
 ## Configuration
 
@@ -81,6 +83,7 @@ that lives with the rest of the extension's settings.
 | [`web-tools/`](web-tools/) | Free, keyless web search through Exa's hosted MCP server, plus `web-read`, a local POSIX `sh` reader that turns a URL into LLM-friendly markdown. No API key. See its [README](web-tools/README.md). |
 | [`Extras/`](Extras/) | `bwrap` sandbox wrapper for the `pi` CLI. See its [README](Extras/README.md). |
 | [`.archived/`](.archived/) | Tools retired from the package, kept for reference. See its [README](.archived/README.md). |
+| [`Experiment/`](Experiment/) | Experimental extensions, listed in the manifest but off until enabled in `pi-tweaks.json`. See its [README](Experiment/README.md). |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to contribute — commit message style, etc. |
 | [`LICENSE`](LICENSE) | ISC — this repository's own files. |
 

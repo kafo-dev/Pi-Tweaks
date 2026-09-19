@@ -73,6 +73,16 @@ export function isExtensionEnabled(extension: string): boolean {
 	return readSection(extension)?.enabled !== false;
 }
 
+/**
+ * Whether an experimental extension should register anything. Unrelated to
+ * `isExtensionEnabled`, which defaults a missing section to on: here the
+ * section must set `"enabled": true`, so a missing section, any other value,
+ * and a malformed file all leave the experiment off.
+ */
+export function isExperimentEnabled(extension: string): boolean {
+	return readSection(extension)?.enabled === true;
+}
+
 /** Replace the given keys of one section, preserving the rest of the file. */
 export function updateSection(extension: string, values: Section): void {
 	const path = configFilePath();
