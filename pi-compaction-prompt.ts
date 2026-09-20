@@ -237,6 +237,33 @@ function stripThinking(
 }
 
 /**
+ * A provider accepts a thinking block back only alongside the tool calls it was
+ * produced with. Thinking on a plain answer has no such requirement, so it is
+ * dropped: after a compaction that answer heads the context and would otherwise
+ * be replayed whole on every request.
+ */
+function stripPlainThinking(
+	messages: ContextEvent["messages"],
+): ContextEvent["messages"] | undefined {
+	let changed = false;
+	const kept = messages.flatMap((message) => {
+		if (message.role !== "assistant" || !Array.isArray(message.content)) {
+			return [message];
+		}
+		if (message.content.some((block) => block.type === "toolCall")) {
+			return [message];
+		}
+		const content = message.content.filter(
+			(block) => block.type !== "thinking",
+		);
+		if (content.length === message.content.length) return [message];
+		changed = true;
+		return content.length === 0 ? [] : [{ ...message, content }];
+	});
+	return changed ? kept : undefined;
+}
+
+/**
  * Same split pi uses: a file that was written or edited is modified, even if
  * it was also read.
  */
@@ -285,6 +312,11 @@ export default function compactionPrompt(pi: ExtensionAPI) {
 		if (prompt.kind === "missing") {
 			ctx.ui.notify(`promptFile is not readable: ${prompt.path}`, "warning");
 		}
+	});
+
+	pi.on("context", (event) => {
+		const messages = stripPlainThinking(event.messages);
+		return messages ? { messages } : undefined;
 	});
 
 	pi.on("session_before_compact", async (event, ctx) => {
