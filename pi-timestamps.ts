@@ -19,6 +19,10 @@
  * the start of the input, and prepending would rewrite text the model has
  * already seen.
  *
+ * A steering or follow-up message is left unstamped. It waits in a queue that
+ * pi restores to the editor verbatim, so a stamp would come back as text the
+ * user looks to have typed. The answer that follows still carries a stamp.
+ *
  * A message that already ends in a stamp is left alone, so a handler left bound
  * by a reload cannot double-stamp through the chained input transform.
  *
@@ -174,6 +178,8 @@ export default function timestamps(pi: ExtensionAPI) {
 
 	pi.on("input", async (event) => {
 		if (event.source === "extension") return { action: "continue" };
+		// A queued message must stay clean: pi restores the queue to the editor.
+		if (event.streamingBehavior !== undefined) return { action: "continue" };
 		return { action: "transform", text: withStamp(event.text) };
 	});
 
