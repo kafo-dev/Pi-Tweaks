@@ -24,7 +24,11 @@
  * The file's body is the instruction text; YAML frontmatter is metadata and
  * is stripped. The extension appends the previous summary, any `/compact`
  * instructions, and the conversation, so the file only says what a good
- * summary contains.
+ * summary contains. Summarization runs under a fixed system prompt that
+ * forbids continuing the conversation or calling tools, and the assistant's
+ * thinking is left out of the transcript so reasoning does not become handoff
+ * content. The retained messages pi keeps are appended so the summarizer can
+ * see how the last turn ended.
  *
  * Without a readable prompt file the extension stays out of the way and pi's
  * default compaction runs. `"enabled": false` turns the extension off.
@@ -36,11 +40,14 @@ import { isAbsolute, join } from "node:path";
 import { uuidv7 } from "@earendil-works/pi-ai";
 import {
 	CONFIG_DIR_NAME,
+	type ContextEvent,
 	convertToLlm,
 	type ExtensionAPI,
 	type ExtensionContext,
 	getAgentDir,
+	type SessionEntry,
 	serializeConversation,
+	sessionEntryToContextMessages,
 } from "@earendil-works/pi-coding-agent";
 import {
 	isExtensionEnabled,
@@ -52,6 +59,31 @@ const EXTENSION = "pi-compaction-prompt";
 const SETTINGS_FILE = "settings.json";
 const PROMPT_FILE_KEY = "promptFile";
 const SUMMARY_MAX_TOKENS = 8192;
+
+/**
+ * The summarizer reads a transcript. Without this guard it tends to answer the
+ * transcript or reach for tools instead of summarizing.
+ */
+const SYSTEM_PROMPT = `You are a context summarization assistant. Read the conversation between a user and an AI assistant, then produce a structured summary following the exact format specified.
+
+Do NOT continue the conversation. Do NOT respond to any questions in the conversation. Do NOT call any tools. ONLY output the structured summary.`;
+
+/**
+ * Marks the front half of one oversized turn. The kept tail is appended after
+ * the conversation, under RETAINED, so the summarizer can see how the turn
+ * ended.
+ */
+const TURN_PREFIX_MARKER = `--- TURN PREFIX ---
+The messages below are the EARLY PART of one turn. The rest of that turn, including how it ended, is under RETAINED. Judge whether the turn finished from the RETAINED messages, never from this prefix alone.`;
+
+/**
+ * The kept messages pi shows after the summary. A small kept-token budget cuts
+ * at the last assistant message, so the retained tail is the answer that ends
+ * the turn. Withholding it makes the summarizer report finished work as
+ * unfinished and reasoning as a result.
+ */
+const RETAINED_MARKER = `--- RETAINED ---
+The messages below are kept verbatim and are shown to the next agent AFTER your summary. They are not replaced by it. Use them to judge what is finished and what to do next. Do not repeat their content in your summary.`;
 
 /** File operations pi extracted from the messages being summarized. */
 type FileOps = {
@@ -147,6 +179,7 @@ function buildRequest(
 	previousSummary: string | undefined,
 	customInstructions: string | undefined,
 	conversation: string,
+	retained: string,
 ): string {
 	const parts = [instructions];
 	if (previousSummary) {
@@ -156,7 +189,51 @@ function buildRequest(
 		parts.push(`Instructions for this summary:\n\n${customInstructions}`);
 	}
 	parts.push(`<conversation>\n${conversation}\n</conversation>`);
+	if (retained.length > 0) {
+		parts.push(`${RETAINED_MARKER}\n\n<retained>\n${retained}\n</retained>`);
+	}
 	return parts.join("\n\n");
+}
+
+/**
+ * Messages pi keeps verbatim after the summary, in the order the next agent
+ * sees them. Only a split turn needs them: it is the one case where the
+ * summarizer's visible input ends in the middle of a turn. Empty when the cut
+ * point is not on this branch.
+ */
+function retainedConversation(
+	branchEntries: SessionEntry[],
+	firstKeptEntryId: string,
+): string {
+	const start = branchEntries.findIndex(
+		(entry) => entry.id === firstKeptEntryId,
+	);
+	if (start < 0) return "";
+	const messages = branchEntries
+		.slice(start)
+		.flatMap((entry) => sessionEntryToContextMessages(entry));
+	return messages.length === 0
+		? ""
+		: serializeConversation(convertToLlm(messages));
+}
+
+/**
+ * Chain-of-thought is not a report. Summarizing it turns "the assistant
+ * considered rejecting this" into handoff content the next agent cannot use.
+ */
+function stripThinking(
+	messages: ContextEvent["messages"],
+): ContextEvent["messages"] {
+	return messages.flatMap((message) => {
+		if (message.role !== "assistant" || !Array.isArray(message.content)) {
+			return [message];
+		}
+		const content = message.content.filter(
+			(block) => block.type !== "thinking",
+		);
+		if (content.length === message.content.length) return [message];
+		return content.length === 0 ? [] : [{ ...message, content }];
+	});
 }
 
 /**
@@ -218,19 +295,33 @@ export default function compactionPrompt(pi: ExtensionAPI) {
 			return;
 		}
 
-		const { preparation, customInstructions, signal } = event;
-		const conversation = serializeConversation(
-			convertToLlm([
-				...preparation.messagesToSummarize,
-				...preparation.turnPrefixMessages,
-			]),
-		);
+		const { preparation, branchEntries, customInstructions, signal } = event;
+		const parts: string[] = [];
+		if (preparation.messagesToSummarize.length > 0) {
+			parts.push(
+				serializeConversation(
+					convertToLlm(stripThinking(preparation.messagesToSummarize)),
+				),
+			);
+		}
+		if (preparation.turnPrefixMessages.length > 0) {
+			parts.push(
+				`${TURN_PREFIX_MARKER}\n\n${serializeConversation(
+					convertToLlm(stripThinking(preparation.turnPrefixMessages)),
+				)}`,
+			);
+		}
+		const conversation = parts.join("\n\n");
+		const retained = preparation.isSplitTurn
+			? retainedConversation(branchEntries, preparation.firstKeptEntryId)
+			: "";
 		const { readFiles, modifiedFiles } = computeFileLists(preparation.fileOps);
 		const request = buildRequest(
 			prompt.instructions,
 			preparation.previousSummary,
 			customInstructions,
 			conversation,
+			retained,
 		);
 
 		const model = ctx.model;
@@ -246,6 +337,7 @@ export default function compactionPrompt(pi: ExtensionAPI) {
 			const response = await ctx.modelRegistry.complete(
 				model,
 				{
+					systemPrompt: SYSTEM_PROMPT,
 					messages: [
 						{
 							role: "user",
