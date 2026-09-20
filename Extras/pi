@@ -8,7 +8,47 @@
 # an ancestor), the project directory stays read-only and the agent is pointed
 # at the scratchpad instead.
 
-real_pi=/usr/bin/pi
+# Resolve the real pi binary. A user or npm prefix installs it outside
+# /usr/bin, so search PATH. Skip this wrapper when it shadows `pi` on PATH,
+# or the wrapper would exec itself in a loop. PI_REAL_PI overrides the search.
+self=$0
+case "$self" in
+*/*) ;;
+*) self=$(command -v "$self") ;;
+esac
+self=$(readlink -f "$self")
+
+if [ -n "${PI_REAL_PI:-}" ]; then
+	real_pi=$PI_REAL_PI
+else
+	real_pi=""
+	old_ifs=$IFS
+	IFS=:
+	# Word splitting on PATH is the point of the unquoted expansion.
+	# Disable globbing so a PATH entry containing a wildcard stays literal.
+	set -f
+	# shellcheck disable=SC2086
+	for dir in $PATH; do
+		candidate="$dir/pi"
+		[ -x "$candidate" ] || continue
+		if [ "$(readlink -f "$candidate")" = "$self" ]; then
+			continue
+		fi
+		real_pi=$candidate
+		break
+	done
+	set +f
+	IFS=$old_ifs
+	if [ -z "$real_pi" ] && [ -x /usr/bin/pi ]; then
+		real_pi=/usr/bin/pi
+	fi
+fi
+
+if [ ! -x "$real_pi" ]; then
+	echo "pi-wrapper: cannot find an executable pi binary; set PI_REAL_PI." >&2
+	exit 1
+fi
+
 bwrap=/usr/bin/bwrap
 
 agent_dir=${PI_CODING_AGENT_DIR:-"$HOME/.pi/agent"}

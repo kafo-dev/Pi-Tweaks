@@ -20,8 +20,20 @@ Link the script into your `PATH` so it shadows the `pi` command:
 ln -s "$PWD/Extras/pi" "$HOME/.local/bin/pi"
 ```
 
-The wrapper execs the real binary at `/usr/bin/pi`, so shadowing the command
-name on `PATH` does not cause recursion.
+The wrapper finds the real `pi` on `PATH`, skipping itself so that
+shadowing the command name does not cause recursion. The first executable
+named `pi` that is not the wrapper is used; `/usr/bin/pi` is the fallback
+when `PATH` has none. Set `PI_REAL_PI` to point at a specific binary
+instead:
+
+```sh
+PI_REAL_PI="$HOME/.nvm/versions/node/$(node -v)/bin/pi" pi
+```
+
+An npm prefix or version-manager install usually lands outside `/usr/bin`,
+so the `PATH` search is what makes the wrapper work on those systems. The
+resolved binary is read through the sandbox's read-only root, so it does not
+need to be a system package.
 
 ### What is writable
 
