@@ -8,6 +8,10 @@ insert_final_newline = true
 [*.{ts,js}]
 indent_style = tab
 
+[*.sh]
+indent_style = tab
+shell_variant = posix
+
 [*.json]
 indent_style = space
 indent_size = 2

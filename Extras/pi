@@ -22,9 +22,9 @@ agents_dir="$HOME/.agents"
 scratch_dir="$agent_dir/scratchpad"
 
 if [ "${BWRAP:-1}" = "0" ]; then
-    echo "pi-wrapper: bwrap is not isolating the agent; pi runs with full permissions." >&2
-    sleep 1
-    exec "$real_pi" "$@"
+	echo "pi-wrapper: bwrap is not isolating the agent; pi runs with full permissions." >&2
+	sleep 1
+	exec "$real_pi" "$@"
 fi
 
 cwd=$(pwd -P)
@@ -37,20 +37,20 @@ host=$(hostname | tr -c 'A-Za-z0-9.-' '-')
 # the scratchpad instead.
 home_readonly=0
 if [ "$cwd" = "$home_real" ]; then
-    home_readonly=1
+	home_readonly=1
 fi
 # A bare "/" is an ancestor of every home directory.
 if [ "$cwd" = / ]; then
-    home_readonly=1
+	home_readonly=1
 fi
 case "$home_real" in
 "$cwd"/*)
-    home_readonly=1
-    ;;
+	home_readonly=1
+	;;
 esac
 
 for d in "$agent_dir" "$cache_dir" "$agents_dir" "$scratch_dir"; do
-    mkdir -p "$d"
+	mkdir -p "$d"
 done
 
 # Extra read-write paths, one per line, next to the agent directory (default
@@ -66,14 +66,14 @@ rw_file="${agent_dir%/*}/rw-paths.txt"
 notice=""
 case "${1-}" in
 install | remove | uninstall | update | list | config | auth)
-    # Management subcommand: passed through with no notice.
-    ;;
+	# Management subcommand: passed through with no notice.
+	;;
 *)
-    if [ "$home_readonly" = 1 ]; then
-        echo "pi-wrapper: $cwd is read-only; scratch files go in $scratch_dir." >&2
-        notice="The working directory ($cwd) is mounted read-only because it is \$HOME or above it. Use $scratch_dir for scratch files; it is writable."
-    fi
-    ;;
+	if [ "$home_readonly" = 1 ]; then
+		echo "pi-wrapper: $cwd is read-only; scratch files go in $scratch_dir." >&2
+		notice="The working directory ($cwd) is mounted read-only because it is \$HOME or above it. Use $scratch_dir for scratch files; it is writable."
+	fi
+	;;
 esac
 
 # Build the bwrap command in "$@": start from pi's own arguments, put the real
@@ -81,53 +81,53 @@ esac
 # reverses the configured order; every bind is read-write, so their relative
 # order does not matter.
 if [ -n "$notice" ]; then
-    set -- "$real_pi" --append-system-prompt "$notice" "$@"
+	set -- "$real_pi" --append-system-prompt "$notice" "$@"
 else
-    set -- "$real_pi" "$@"
+	set -- "$real_pi" "$@"
 fi
 
 if [ -f "$rw_file" ]; then
-    while IFS= read -r path || [ -n "$path" ]; do
-        path=$(printf '%s\n' "$path" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
-        case "$path" in
-        "" | '#'*) continue ;;
-        esac
-        # The tilde in the "~/" pattern is a literal case pattern, not a
-        # shell expansion, so shellcheck's SC2088 does not apply.
-        # shellcheck disable=SC2088
-        case "$path" in
-        "~") path=$HOME ;;
-        "~/"*) path="$HOME${path#?}" ;;
-        esac
-        case "$path" in
-        /*) ;;
-        *)
-            echo "pi-wrapper: ignoring non-absolute path in $rw_file: $path" >&2
-            continue
-            ;;
-        esac
-        set -- --bind-try "$path" "$path" "$@"
-    done <"$rw_file"
+	while IFS= read -r path || [ -n "$path" ]; do
+		path=$(printf '%s\n' "$path" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+		case "$path" in
+		"" | '#'*) continue ;;
+		esac
+		# The tilde in the "~/" pattern is a literal case pattern, not a
+		# shell expansion, so shellcheck's SC2088 does not apply.
+		# shellcheck disable=SC2088
+		case "$path" in
+		"~") path=$HOME ;;
+		"~/"*) path="$HOME${path#?}" ;;
+		esac
+		case "$path" in
+		/*) ;;
+		*)
+			echo "pi-wrapper: ignoring non-absolute path in $rw_file: $path" >&2
+			continue
+			;;
+		esac
+		set -- --bind-try "$path" "$path" "$@"
+	done <"$rw_file"
 fi
 
 # The project directory is read-write only when it does not expose $HOME.
 if [ "$home_readonly" = 0 ]; then
-    set -- --bind "$cwd" "$cwd" "$@"
+	set -- --bind "$cwd" "$cwd" "$@"
 fi
 
 set -- \
-    --unshare-all \
-    --share-net \
-    --die-with-parent \
-    --hostname "$host-Pi-Isolated" \
-    --ro-bind / / \
-    --proc /proc \
-    --dev /dev \
-    --tmpfs /tmp \
-    --bind "$agent_dir" "$agent_dir" \
-    --bind "$cache_dir" "$cache_dir" \
-    --bind "$agents_dir" "$agents_dir" \
-    --bind "$scratch_dir" "$scratch_dir" \
-    "$@"
+	--unshare-all \
+	--share-net \
+	--die-with-parent \
+	--hostname "$host-Pi-Isolated" \
+	--ro-bind / / \
+	--proc /proc \
+	--dev /dev \
+	--tmpfs /tmp \
+	--bind "$agent_dir" "$agent_dir" \
+	--bind "$cache_dir" "$cache_dir" \
+	--bind "$agents_dir" "$agents_dir" \
+	--bind "$scratch_dir" "$scratch_dir" \
+	"$@"
 
 exec "$bwrap" "$@"
