@@ -18,8 +18,7 @@
 			"./pi-compaction-prompt.ts",
 			"./pi-exit.ts",
 			"./pi-pinned-skills.ts",
-			"./pi-stop.ts",
-			"./pi-timestamps.ts"
+			"./pi-stop.ts"
 		],
 		"skills": [
 			"./browser-tools",

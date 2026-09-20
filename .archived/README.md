@@ -20,6 +20,14 @@ pipeline, and sometimes it used `python -c` even with the tool available. The
 choice was inconsistent, so the extra tool did not justify the additional
 context it consumed or the decision fatigue it added.
 
+The `pi-timestamps` extension came next. The hypothesis was that a clock in the
+transcript — a date and time stamp on each sent prompt and on the final answer
+of a turn — would give the model time awareness. In practice the model made no
+use of the stamp, and the extension conflicted with other features often
+enough to cost more than it gave. The stamp was appended to the raw input,
+before pi expanded a prompt template, so the template argument parser read it
+as extra arguments.
+
 The source is kept for two reasons:
 
 - The approach can inspire a future tool, or the hypothesis can be revisited
@@ -53,3 +61,4 @@ pi install .archived/<name>.ts
 | Path | What |
 |------|------|
 | [`pi-python.ts`](pi-python.ts) | Adds a `python` tool that runs raw Python 3 source passed as one argv entry, so the source needs no shell quoting or code fences. A `pip` field installs packages into a shared virtual environment before the run, and `retry_previous` re-runs the last program. |
+| [`pi-timestamps.ts`](pi-timestamps.ts) | Appends a date and time stamp to each sent prompt and to the final answer of a turn. The stamp is added before pi expands a prompt template, so the template argument parser reads it as extra arguments and a `${1:-default}` argument loses its default. |

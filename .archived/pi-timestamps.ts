@@ -31,7 +31,7 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { isExtensionEnabled } from "./pi-tweaks-config";
+import { isExtensionEnabled } from "../pi-tweaks-config";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = [

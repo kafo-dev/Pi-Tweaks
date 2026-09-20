@@ -36,7 +36,6 @@ extension's settings and an `enabled` switch:
   },
   "pi-pinned-skills": { "enabled": true, "skills": ["agent-context"] },
   "pi-compaction-prompt": { "enabled": true, "promptFile": "COMPACT.md" },
-  "pi-timestamps": { "enabled": true },
   "pi-stop": { "enabled": true },
   "pi-exit": { "enabled": true }
 }
@@ -54,7 +53,7 @@ start (or `/reload`).
 | `pi-notify` | `backend`, `phone`, `device`; `/notify` writes them back here |
 | `pi-pinned-skills` | `skills`: names whose full text is pinned into the system prompt |
 | `pi-compaction-prompt` | `promptFile`: path to the Markdown summary prompt |
-| `pi-timestamps`, `pi-stop`, `pi-exit` | `enabled` only |
+| `pi-stop`, `pi-exit` | `enabled` only |
 
 Settings written by an extension (`/notify`) merge into the file, so the other
 sections and the `enabled` switch survive. Extensions that had their own files
@@ -78,7 +77,6 @@ that lives with the rest of the extension's settings.
 | [`pi-exit.ts`](pi-exit.ts) | Extension that adds `/exit` as an alias for pi's built-in `/quit`. |
 | [`pi-bash-timeout.ts`](pi-bash-timeout.ts) | Extension that fills in the built-in `bash` tool's `timeout` parameter (in seconds) when the model omits it, so a hung command cannot stall a turn. An explicit model value wins. The default is `pi-bash-timeout.timeoutSeconds` (10). |
 | [`pi-stop.ts`](pi-stop.ts) | Extension that adds `/stop`, which aborts the running turn — the same abort as Escape. It works while the agent is streaming, because pi dispatches commands before it queues steering input. |
-| [`pi-timestamps.ts`](pi-timestamps.ts) | Extension that appends a date and time stamp to each sent prompt and to the final answer of a turn, so the model can see when it last spoke and when you last wrote. Each stamp carries the gap since the previous one (`+1m30s`), and the counter resets at each session start. The stamp lives in the session and the model context but is hidden from the rendered transcript. Messages that stopped to call a tool are skipped. |
 | [`browser-tools/`](browser-tools/) | CDP browser-automation skill. **Read [`browser-tools/NOTICE.md`](browser-tools/NOTICE.md)** for attribution and licensing before using or redistributing. |
 | [`web-tools/`](web-tools/) | Free, keyless web search through Exa's hosted MCP server, plus `web-read`, a local POSIX `sh` reader that turns a URL into LLM-friendly markdown. No API key. See its [README](web-tools/README.md). |
 | [`Extras/`](Extras/) | `bwrap` sandbox wrapper for the `pi` CLI. See its [README](Extras/README.md). |
