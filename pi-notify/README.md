@@ -8,9 +8,10 @@ an alarm on your phone over KDE Connect.
 | `agent_settled` | pi finished the turn and is waiting for your reply |
 | `ui_prompt_start` | pi is blocked on a confirm / select / input / editor dialog |
 
-A turn stopped with `/stop` does not notify: the user just stopped it. `/stop`
-tells pi-notify over pi's shared event bus, so no desktop or phone alert fires
-for that settle. A normal settle still alerts.
+An abort does not suppress the alert by itself. The retired `pi-stop` extension
+announced its aborts with an event on pi's shared event bus, and pi-notify
+skips the settle that event names; Escape and Ctrl+C abort the same way
+without announcing it, so they alert like any other settle.
 
 ## Install
 

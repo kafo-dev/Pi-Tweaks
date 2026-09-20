@@ -14,7 +14,7 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { isExtensionEnabled } from "./pi-tweaks-config";
+import { isExtensionEnabled } from "../pi-tweaks-config";
 
 export default function (pi: ExtensionAPI) {
 	if (!isExtensionEnabled("pi-stop")) return;

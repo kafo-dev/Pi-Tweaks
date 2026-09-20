@@ -156,8 +156,10 @@ async function notifyUser(ctx: ExtensionContext, body: string) {
 export default function (pi: ExtensionAPI) {
 	if (!isExtensionEnabled(EXTENSION)) return;
 
-	// `/stop` aborts the turn on purpose, so the settle that follows is not news.
-	// pi-stop announces the abort; skip that one alert.
+	// The retired pi-stop extension announced an intentional abort on this bus,
+	// so the settle it causes is not news. The listener stays for the archived
+	// copy, loadable with `pi -e .archived/pi-stop.ts`; Escape and Ctrl+C abort
+	// without announcing.
 	let turnAborted = false;
 	pi.events.on("turn-aborted", () => {
 		turnAborted = true;

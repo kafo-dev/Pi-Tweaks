@@ -18,7 +18,6 @@
 			"./pi-compaction-prompt.ts",
 			"./pi-exit.ts",
 			"./pi-pinned-skills.ts",
-			"./pi-stop.ts",
 			"./Experiment/minimal-tools.ts"
 		],
 		"skills": [
