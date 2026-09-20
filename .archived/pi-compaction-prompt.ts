@@ -53,7 +53,7 @@ import {
 	isExtensionEnabled,
 	readSection,
 	stringValue,
-} from "./pi-tweaks-config";
+} from "../pi-tweaks-config";
 
 const EXTENSION = "pi-compaction-prompt";
 const SETTINGS_FILE = "settings.json";

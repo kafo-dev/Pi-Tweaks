@@ -9,8 +9,10 @@ deleted so that the approach remains readable and available.
 Each tool was built to test an idea against real sessions, then judged on what
 those sessions showed. The `python` tool and the `pi-timestamps` extension were
 hypotheses about model behavior; `pi-stop` was a convenience written without
-knowing that pi already binds Escape to cancel/abort. Retirement is a judgement
-about the tool's value, not a claim that the code is broken.
+knowing that pi already binds Escape to cancel/abort; `pi-compaction-prompt`
+replaced pi's compaction instruction and had to rebuild the guards that came
+with it. Retirement is a judgement about the tool's value, not a claim that the
+code is broken.
 
 The first case was the `python` tool. The hypothesis was that passing raw
 Python source as one argv entry would remove the quoting friction of
@@ -35,6 +37,21 @@ part of the command's case. The extension also announced its aborts on pi's
 shared event bus so pi-notify could skip the settle they cause; that event has
 no other producer, so the archived source is what keeps the announcement
 available.
+
+The `pi-compaction-prompt` extension came fourth. The hypothesis was that a
+Markdown file of project-specific instructions would produce better handoffs
+than pi's generic compaction prompt. Replacing the instruction also replaced
+the guards that came with it: pi sends the summarizer a system prompt that
+forbids answering the transcript or calling tools, and marks the early half of
+a split turn with a note of its own. The extension's request carried neither,
+so the summarizer could answer instead of summarize, and it read a turn that
+continued past the cut as the whole of that turn. The last revision rebuilds
+both guards and goes further than pi does — it shows the summarizer the
+messages pi retains after the cut, and strips the assistant's thinking so
+reasoning cannot become handoff content. That revision is the reason the
+source is worth keeping, and its cost is the reason the extension is not: a
+custom compaction prompt has to re-derive guards pi already carries and track
+pi's compaction internals to stay correct.
 
 The source is kept for two reasons:
 
@@ -71,3 +88,4 @@ pi install .archived/<name>.ts
 | [`pi-python.ts`](pi-python.ts) | Adds a `python` tool that runs raw Python 3 source passed as one argv entry, so the source needs no shell quoting or code fences. A `pip` field installs packages into a shared virtual environment before the run, and `retry_previous` re-runs the last program. |
 | [`pi-timestamps.ts`](pi-timestamps.ts) | Appends a date and time stamp to each sent prompt and to the final answer of a turn. The stamp is added before pi expands a prompt template, so the template argument parser reads it as extra arguments and a `${1:-default}` argument loses its default. |
 | [`pi-stop.ts`](pi-stop.ts) | Adds `/stop`, which aborts the running turn — the same abort as Escape. Commands are dispatched before pi decides whether an input is a steering message, so the command also works while the agent is streaming. It emits `turn-aborted` on pi's shared event bus so pi-notify can skip the alert for the settle it causes. |
+| [`pi-compaction-prompt.ts`](pi-compaction-prompt.ts) | Replaces pi's compaction prompt with the body of the Markdown file named by `pi-compaction-prompt.promptFile`. A missing or unreadable file leaves pi's default compaction in place. The request carries its own system prompt, split-turn marker, retained tail, and thinking filter, because the file supplies none of them. |

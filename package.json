@@ -15,7 +15,6 @@
 		"extensions": [
 			"./pi-notify/index.ts",
 			"./pi-bash-timeout.ts",
-			"./pi-compaction-prompt.ts",
 			"./pi-exit.ts",
 			"./pi-pinned-skills.ts",
 			"./Experiment/minimal-tools.ts"

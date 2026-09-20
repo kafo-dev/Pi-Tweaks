@@ -37,7 +37,6 @@ extension's settings and an `enabled` switch:
     "device": ""
   },
   "pi-pinned-skills": { "enabled": true, "skills": ["agent-context"] },
-  "pi-compaction-prompt": { "enabled": true, "promptFile": "COMPACT.md" },
   "pi-exit": { "enabled": true }
 }
 ```
@@ -53,14 +52,13 @@ start (or `/reload`).
 | `pi-bash-timeout` | `timeoutSeconds` (default 10) |
 | `pi-notify` | `backend`, `phone`, `device`; `/notify` writes them back here |
 | `pi-pinned-skills` | `skills`: names whose full text is pinned into the system prompt |
-| `pi-compaction-prompt` | `promptFile`: path to the Markdown summary prompt |
 | `pi-exit` | `enabled` only |
 
 Settings written by an extension (`/notify`) merge into the file, so the other
 sections and the `enabled` switch survive. Extensions that had their own files
-before — `pi-notify.json`, `pinned-skills.json`, and `compaction.promptFile` in
-`settings.json` — are still read for backward compatibility until the matching
-section exists; the first write migrates the settings into `pi-tweaks.json`.
+before — `pi-notify.json` and `pinned-skills.json` — are still read for
+backward compatibility until the matching section exists; the first write
+migrates the settings into `pi-tweaks.json`.
 
 pi's own `pi config` command can also enable or disable an installed
 extension through `settings.json`; `enabled` in `pi-tweaks.json` is the switch
@@ -74,7 +72,6 @@ that lives with the rest of the extension's settings.
 | [`pi-tweaks-config.ts`](pi-tweaks-config.ts) | Shared configuration for every extension: reads and writes `pi-tweaks.json`, applies the `enabled` switch and the per-extension settings, and validates each value. |
 | [`pi-notify/`](pi-notify/) | Extension that notifies you — desktop and KDE Connect phone alarm — when pi settles a turn or blocks on a dialog. Terminal notifications on by default, phone off. See its [README](pi-notify/README.md). |
 | [`pi-pinned-skills.ts`](pi-pinned-skills.ts) | Extension that appends the full text of skills named in `pi-pinned-skills.skills` to the system prompt on every turn, so they apply without the model deciding to read them. The block is deterministic, which keeps it inside the provider's cached prefix. `/pinned-skills` reports what resolved. |
-| [`pi-compaction-prompt.ts`](pi-compaction-prompt.ts) | Extension that replaces pi's compaction prompt with the body of a Markdown file named by `pi-compaction-prompt.promptFile`. The previous summary, `/compact` instructions, and the conversation are appended, and the read/modified file lists pi normally adds are kept. Unset means pi's default compaction. |
 | [`pi-exit.ts`](pi-exit.ts) | Extension that adds `/exit` as an alias for pi's built-in `/quit`. |
 | [`pi-bash-timeout.ts`](pi-bash-timeout.ts) | Extension that fills in the built-in `bash` tool's `timeout` parameter (in seconds) when the model omits it, so a hung command cannot stall a turn. An explicit model value wins. The default is `pi-bash-timeout.timeoutSeconds` (10). |
 | [`browser-tools/`](browser-tools/) | CDP browser-automation skill. **Read [`browser-tools/NOTICE.md`](browser-tools/NOTICE.md)** for attribution and licensing before using or redistributing. |
