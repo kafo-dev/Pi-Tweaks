@@ -92,6 +92,9 @@ if [ -f "$rw_file" ]; then
         case "$path" in
         "" | '#'*) continue ;;
         esac
+        # The tilde in the "~/" pattern is a literal case pattern, not a
+        # shell expansion, so shellcheck's SC2088 does not apply.
+        # shellcheck disable=SC2088
         case "$path" in
         "~") path=$HOME ;;
         "~/"*) path="$HOME${path#?}" ;;
