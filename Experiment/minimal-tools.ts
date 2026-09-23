@@ -1,17 +1,17 @@
 /**
- * minimal-tools — an experimental three-tool agent surface.
+ * minimal-tools — an experimental two-tool agent surface.
  *
- * The active tool set is reduced to `media`, `edit`, and `bash`:
+ * The active tool set is reduced to `media` and `bash`:
  *
  * - `media` replaces `read`. It delegates to the built-in read tool, so text
  *   and images work today; the name signals the intended role, reading media
  *   the model cannot consume as text (audio, video).
- * - `edit` stays for surgical file changes.
- * - `bash` stays for everything else: `sed`, `fd`, `rg`, and the rest.
+ * - `bash` is everything else: `sed` and `patch` for file changes, plus `fd`,
+ *   `rg`, and arbitrary commands.
  *
- * `read`, `write`, `find`, `grep`, and `ls` are removed from the active set.
- * `media` and `bash` carry short descriptions so the prompt does not advertise
- * behavior the experiment drops.
+ * `read`, `write`, `edit`, `find`, `grep`, and `ls` are removed from the
+ * active set. `media` and `bash` carry short descriptions so the prompt does
+ * not advertise behavior the experiment drops.
  *
  * `bash` runs through `pi.exec` so its output is bounded: output longer than
  * `maxLines` lines is cut to the first and last half, with the dropped count
@@ -57,7 +57,7 @@ import {
 
 const EXTENSION = "experiment-minimal-tools";
 const MEDIA_TOOL = "media"; // replaces the built-in `read`
-const DISABLED_TOOLS = new Set(["read", "write", "find", "grep", "ls"]);
+const DISABLED_TOOLS = new Set(["read", "write", "edit", "find", "grep", "ls"]);
 const DEFAULT_BASH_TIMEOUT_SECONDS = 32; // when the model passes none
 const DEFAULT_MAX_LINES = 1024; // total lines before truncating, split per end
 const DEFAULT_MAX_BYTES = 32 * 1024; // total bytes before truncating

@@ -34,12 +34,11 @@ After the extension loads, the active tools are:
 | Tool | Role |
 |------|------|
 | `media` | reads files, including images; the built-in `read` under a name that signals the intended role for audio and video |
-| `edit` | surgical file changes |
-| `bash` | everything else — `sed`, `fd`, `rg`, and arbitrary commands |
+| `bash` | everything else — `sed` and `patch` for file changes, plus `fd`, `rg`, and arbitrary commands |
 
-The built-in `read`, `write`, `find`, `grep`, and `ls` tools are removed from
-the active set; `edit` is untouched. `media` delegates to the built-in `read`
-tool, and `bash` runs through `pi.exec`. Both replace their descriptions with
+The built-in `read`, `write`, `edit`, `find`, `grep`, and `ls` tools are
+removed from the active set. `media` delegates to the built-in `read` tool,
+and `bash` runs through `pi.exec`. Both replace their descriptions with
 shorter ones, so text and images keep working while the prompt does not
 advertise behavior the experiment drops.
 
