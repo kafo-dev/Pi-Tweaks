@@ -16,9 +16,9 @@ installs the dependencies and discovers each skill's `SKILL.md` plus every
 extension listed in `pi.extensions`. The skills load on demand and are available
 as `/skill:browser-tools` and `/skill:web-tools`; the packaged extensions are
 loaded at startup. `pi-notify` notifies on the terminal out of the box, while
-its phone leg stays off until you configure it. The experimental extension in
-`Experiment/` is loaded too, but registers nothing until
-`experiment-minimal-tools.enabled` is `true` in `pi-tweaks.json`.
+its phone leg stays off until you configure it. The experimental extensions in
+`Experiment/` are loaded too, but each registers nothing until its section is
+enabled in `pi-tweaks.json` (`experiment-minimal-mode`).
 
 ## Configuration
 

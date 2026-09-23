@@ -17,7 +17,7 @@
 			"./pi-bash-timeout.ts",
 			"./pi-exit.ts",
 			"./pi-pinned-skills.ts",
-			"./Experiment/minimal-tools.ts"
+			"./Experiment/minimal-mode.ts"
 		],
 		"skills": [
 			"./browser-tools",

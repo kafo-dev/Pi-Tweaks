@@ -1,5 +1,5 @@
 /**
- * minimal-tools — an experimental reduced agent surface with a collapsed
+ * minimal-mode — an experimental reduced agent surface with a collapsed
  * `bash` row.
  *
  * One switch enables two behaviors:
@@ -13,7 +13,7 @@
  *
  *   `read`, `write`, `edit`, `find`, `grep`, and `ls` are removed from the
  *   active set. `media` and `bash` carry short descriptions so the prompt does
- *   not advertise behavior the experiment drops.
+ *   not advertise behavior the mode drops.
  *
  * - The `bash` row is collapsed:
  *   - Collapsed: one line — `$ ` plus the command, cut to the viewport width,
@@ -40,14 +40,14 @@
  * another, so this one warns on `session_start` when pi-bash-timeout is still
  * on.
  *
- * Config, all under `experiment-minimal-tools` in `pi-tweaks.json`:
+ * Config, all under `experiment-minimal-mode` in `pi-tweaks.json`:
  * `timeoutSeconds` (32), `maxLines` (1024, 512 at each end), and `maxBytes`
  * (32768).
  *
  * The extension is listed in the package manifest, so pi loads it, but it
  * registers nothing until enabled by hand:
  *
- *   { "experiment-minimal-tools": { "enabled": true } }
+ *   { "experiment-minimal-mode": { "enabled": true } }
  *
  * `"enabled": false`, a missing section, and any other value all leave it off.
  * See the Experiment README and pi-tweaks-config.ts.
@@ -79,7 +79,7 @@ import {
 	type Section,
 } from "../pi-tweaks-config";
 
-const EXTENSION = "experiment-minimal-tools";
+const EXTENSION = "experiment-minimal-mode";
 const MEDIA_TOOL = "media"; // replaces the built-in `read`
 const DISABLED_TOOLS = new Set(["read", "write", "edit", "find", "grep", "ls"]);
 
@@ -99,15 +99,15 @@ const MIN_SHOWN_SECONDS = 2; // omit the time below this
 const MIN_SHOWN_TOKENS = 128; // omit the token estimate below this
 const META_CAP = 200; // tool rows whose suffix data is kept
 
-/** Resolved settings for the experiment. */
-interface MinimalToolsOptions {
+/** Resolved settings for the mode. */
+interface MinimalModeOptions {
 	timeoutSeconds: number;
 	maxLines: number;
 	maxBytes: number;
 }
 
-/** The settings of the `experiment-minimal-tools` section, with defaults. */
-function minimalToolsOptions(section: Section | null): MinimalToolsOptions {
+/** The settings of the `experiment-minimal-mode` section, with defaults. */
+function minimalModeOptions(section: Section | null): MinimalModeOptions {
 	return {
 		timeoutSeconds: numberValue(
 			section,
@@ -361,7 +361,7 @@ const BASH_PARAMETERS = Type.Object({
 /** The bounded `bash` tool: bounded output, and a default timeout. */
 function boundedBashTool(
 	pi: ExtensionAPI,
-	options: MinimalToolsOptions,
+	options: MinimalModeOptions,
 ): ToolDefinition<typeof BASH_PARAMETERS, BashToolDetails | undefined> {
 	return {
 		name: "bash",
@@ -422,7 +422,7 @@ type BashRenderers = Pick<
 export default function (pi: ExtensionAPI) {
 	if (!isExperimentEnabled(EXTENSION)) return;
 
-	const options = minimalToolsOptions(readSection(EXTENSION));
+	const options = minimalModeOptions(readSection(EXTENSION));
 
 	pi.registerTool({
 		name: MEDIA_TOOL,
@@ -495,7 +495,7 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_start", (_event, ctx) => {
 		if (readSection("pi-bash-timeout")?.enabled !== false) {
 			ctx.ui.notify(
-				"experiment-minimal-tools: pi-bash-timeout is enabled in pi-tweaks.json and sets the same default bash timeout; disable it there so only one extension owns that value.",
+				"experiment-minimal-mode: pi-bash-timeout is enabled in pi-tweaks.json and sets the same default bash timeout; disable it there so only one extension owns that value.",
 				"warning",
 			);
 		}

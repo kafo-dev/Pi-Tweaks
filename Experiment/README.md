@@ -6,7 +6,7 @@ registers nothing until enabled by hand in `pi-tweaks.json`:
 
 ```json
 {
-  "experiment-minimal-tools": {
+  "experiment-minimal-mode": {
     "enabled": true,
     "timeoutSeconds": 32,
     "maxLines": 1024,
@@ -25,7 +25,7 @@ settled idea that proves beneficial graduates by moving the file next to the
 packaged extensions and dropping the `experiment-` prefix from its
 `pi-tweaks.json` section.
 
-## `minimal-tools.ts`
+## `minimal-mode.ts`
 
 Hypotheses: a smaller tool surface cuts the choices the model makes per turn,
 and a one-line `bash` row keeps the command visible while the output stays out
@@ -42,7 +42,7 @@ The built-in `read`, `write`, `edit`, `find`, `grep`, and `ls` tools are
 removed from the active set. `media` delegates to the built-in `read` tool and
 `bash` runs through `pi.exec`, and both replace their descriptions with shorter
 ones, so text and images keep working while the prompt does not advertise
-behavior the experiment drops.
+behavior the mode drops.
 
 `bash` bounds its output: past `maxLines` lines total (default 1024, split 512
 at each end) or `maxBytes` bytes (default 32768), the middle is dropped and the
@@ -65,14 +65,14 @@ successful, small command keeps just its command, while
 
 ## Conflicts
 
-`minimal-tools` sets a default bash timeout, which `pi-bash-timeout` also does.
+`minimal-mode` sets a default bash timeout, which `pi-bash-timeout` also does.
 Enable only one: with both on, the value depends on extension load order, and
 the experiment warns on startup while both are still on. An extension cannot
 disable another, so disable the packaged extension in the same file:
 
 ```json
 {
-  "experiment-minimal-tools": { "enabled": true },
+  "experiment-minimal-mode": { "enabled": true },
   "pi-bash-timeout": { "enabled": false }
 }
 ```
