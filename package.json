@@ -16,7 +16,7 @@
 			"./pi-notify/index.ts",
 			"./pi-bash-timeout.ts",
 			"./pi-exit.ts",
-			"./pi-pinned-skills.ts",
+			"./pin-document.ts",
 			"./Experiment/minimal-mode.ts"
 		],
 		"skills": [
