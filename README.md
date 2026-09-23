@@ -61,12 +61,14 @@ start (or `/reload`).
 
 `pin-document` also reads a project file, `<cwd>/.pi/pin-document.json`, when
 the project is trusted; it takes precedence over the section. Both forms hold
-the same objects, and a relative `path` resolves against the directory of the
-file that names it:
+the same objects. A `path` that starts with `~` resolves against the home
+directory; any other relative `path` resolves against the directory of the file
+that names it:
 
 ```json
 [
   { "path": "../docs/style.md", "showPathToAgent": true, "stripFrontmatter": false },
+  { "path": "~/notes/style.md", "showPathToAgent": false, "stripFrontmatter": true },
   { "path": "/absolute/path/notes.md", "showPathToAgent": false, "stripFrontmatter": true }
 ]
 ```
@@ -75,9 +77,10 @@ All three keys are required: `path`, the boolean `showPathToAgent`, and the
 boolean `stripFrontmatter`. `stripFrontmatter` removes a leading YAML
 frontmatter block. Either boolean true wraps the document in a `<document>`
 element; `showPathToAgent` adds the path to it, so the model can read the file
-for the parts the block omits. The path is relative to the working directory
-when the document is under it, `~/…` when it is under the home directory, and
-absolute otherwise. With both false the document text is appended as-is.
+for the parts the block omits. The reported path is relative to the working
+directory when the document is under it, `~/…` when it is under the home
+directory, and absolute otherwise. With both false the document text is
+appended as-is.
 
 Settings written by an extension (`/notify`) merge into the file, so the other
 sections and the `enabled` switch survive. An extension that had its own file
@@ -96,7 +99,7 @@ that lives with the rest of the extension's settings.
 | [`package.json`](package.json) | pi package manifest (`pi.extensions`, `pi.skills`) + dependencies |
 | [`pi-tweaks-config.ts`](pi-tweaks-config.ts) | Shared configuration for every extension: reads and writes `pi-tweaks.json`, applies the `enabled` switch and the per-extension settings, and validates each value. |
 | [`pi-notify/`](pi-notify/) | Extension that notifies you — desktop and KDE Connect phone alarm — when pi settles a turn or blocks on a dialog. Terminal notifications on by default, phone off. See its [README](pi-notify/README.md). |
-| [`pin-document.ts`](pin-document.ts) | Extension that appends the full text of the Markdown documents named in `pin-document.documents` to the system prompt on every turn, so they apply without the model deciding to read them. A relative path resolves against the config file that names it. A document is appended as-is unless `showPathToAgent` or `stripFrontmatter` is true, which wraps it in a `<document>` element and, for `showPathToAgent`, writes a path into it — working-directory-relative, `~/…` under home, or absolute. The text is deterministic, which keeps it inside the provider's cached prefix. An invalid config or an unreadable document is reported as an error, and nothing is pinned for that turn. `/pi-tweaks pin-document` reports the resolved set, the byte size, and an estimated token count (four characters per token). |
+| [`pin-document.ts`](pin-document.ts) | Extension that appends the full text of the Markdown documents named in `pin-document.documents` to the system prompt on every turn, so they apply without the model deciding to read them. A `~` path resolves against the home directory, and any other relative path against the config file that names it. A document is appended as-is unless `showPathToAgent` or `stripFrontmatter` is true, which wraps it in a `<document>` element and, for `showPathToAgent`, writes a path into it — working-directory-relative, `~/…` under home, or absolute. The text is deterministic, which keeps it inside the provider's cached prefix. An invalid config or an unreadable document is reported as an error, and nothing is pinned for that turn. `/pi-tweaks pin-document` reports the resolved set, the byte size, and an estimated token count (four characters per token). |
 | [`pi-exit.ts`](pi-exit.ts) | Extension that adds `/exit` as an alias for pi's built-in `/quit`. |
 | [`pi-bash-timeout.ts`](pi-bash-timeout.ts) | Extension that fills in the built-in `bash` tool's `timeout` parameter (in seconds) when the model omits it, so a hung command cannot stall a turn. An explicit model value wins. The default is `pi-bash-timeout.timeoutSeconds` (10). |
 | [`browser-tools/`](browser-tools/) | CDP browser-automation skill. **Read [`browser-tools/NOTICE.md`](browser-tools/NOTICE.md)** for attribution and licensing before using or redistributing. |

@@ -20,8 +20,9 @@
  *
  *   { "pin-document": { "enabled": true, "documents": [ ... ] } }
  *
- * `path` is required, and a relative path resolves against the directory of
- * the config file that names it. `showPathToAgent` is required: when true, the
+ * `path` is required. A path that starts with `~` resolves against the home
+ * directory; any other relative path resolves against the directory of the
+ * config file that names it. `showPathToAgent` is required: when true, the
  * path is written into the block, so the model can read the file again for the
  * parts the block omits. The path is relative to the working directory when the
  * document is under it, `~/…` when it is under the home directory, and absolute
@@ -155,6 +156,13 @@ function resolveConfig(ctx: ExtensionContext): Resolved {
 	return { kind: "missing" };
 }
 
+/** `~` or `~/…` resolved against the home directory; anything else unchanged. */
+function expandHome(path: string): string {
+	if (path === "~") return homedir();
+	if (path.startsWith("~/")) return join(homedir(), path.slice(2));
+	return path;
+}
+
 /** The part of `path` below `parent`, or null when it is not below it. */
 function relativeTo(parent: string, path: string): string | null {
 	const prefix = parent.endsWith(sep) ? parent : parent + sep;
@@ -162,12 +170,18 @@ function relativeTo(parent: string, path: string): string | null {
 	return path.slice(prefix.length);
 }
 
-/** Working-directory-relative, then `~/…` under home, then absolute. */
+/**
+ * `~` for home itself, working-directory-relative, then `~/…` under home, then
+ * absolute.
+ */
 function displayPath(path: string, cwd: string): string {
+	const home = resolve(homedir());
+	if (path === home) return "~";
+
 	const fromCwd = relativeTo(resolve(cwd), path);
 	if (fromCwd !== null) return fromCwd;
 
-	const fromHome = relativeTo(resolve(homedir()), path);
+	const fromHome = relativeTo(home, path);
 	if (fromHome !== null) return `~/${fromHome}`;
 
 	return path;
@@ -188,7 +202,7 @@ function build(
 	const parts: string[] = [];
 
 	for (const document of documents) {
-		const path = resolve(configDir, document.path);
+		const path = resolve(configDir, expandHome(document.path));
 		if (seen.has(path)) continue;
 		seen.add(path);
 
