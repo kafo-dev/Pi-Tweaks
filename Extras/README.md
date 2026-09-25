@@ -9,8 +9,10 @@ Pi has no built-in sandbox: built-in tools, extensions, and package installs
 run with the permissions of the user account. This wrapper binds the whole
 filesystem read-only and re-binds only the project directory, an agent
 scratchpad, and a few state directories read-write, so a session cannot write
-anywhere else under `$HOME`. It is silent on the sandboxed path, except when it
-starts from `$HOME` (see below).
+anywhere else under `$HOME`. It writes nothing to stderr on the sandboxed path,
+except when it starts from `$HOME` (see below); every session it starts carries
+the system-prompt note described under
+[Sandbox notice](#sandbox-notice).
 
 ### Install
 
@@ -56,11 +58,25 @@ projects accordingly.
 
 Starting from `$HOME` or an ancestor of it would expose all of `$HOME` if the
 project directory were bound read-write. Instead the project directory stays
-read-only for that run, and the agent is told through an appended
-system-prompt note that files it needs to write belong in the scratchpad.
-Management subcommands (`install`, `remove`, `update`, `list`, `config`,
-`auth`) start no agent session and are passed through unchanged: pi recognizes
-them only as the first argument, so no note can be inserted before one.
+read-only for that run, and the appended note names the scratchpad, not the
+project directory, as the place for new files. Management subcommands
+(`install`, `remove`, `update`, `list`, `config`, `auth`) start no agent session
+and are passed through unchanged: pi recognizes them only as the first argument,
+so no note can be inserted before one.
+
+### Sandbox notice
+
+The sandbox is invisible from inside, so a blocked write reads as a broken
+environment: the agent either gives up or tries to work around the mount. To
+prevent that, the wrapper appends a note to the system prompt of every session
+it starts. The note names the sandbox rather than the mounts, which the user
+can change between runs, and states what to do on a permission or
+read-only-filesystem error — report it and ask the user to lift the restriction
+on that path, either by listing it in `rw-paths.txt` or by restarting with
+`BWRAP=0`.
+
+The note travels as `--append-system-prompt` text, so the wrapper still writes
+nothing to disk. A management subcommand starts no session and gets no note.
 
 ### Scratchpad
 

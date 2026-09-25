@@ -100,18 +100,26 @@ done
 # reachable inside the sandbox.
 rw_file="${agent_dir%/*}/rw-paths.txt"
 
+# The agent cannot see the sandbox from inside, so it is told about it. Without
+# this note a permission error reads as a broken environment, and the agent
+# either gives up or tries to work around the mount. The note stays generic: it
+# names the sandbox, not the mounts, which the user can change between runs. Pi
+# takes the note as inline text (--append-system-prompt), so nothing has to be
+# written to disk.
+notice="This session runs inside a bubblewrap sandbox, which mounts most of the filesystem read-only. A write that fails with a permission or read-only-filesystem error is being blocked by the sandbox: do not try to work around the mount. Ask the user to lift the restriction on that path. On the host they can list it in $rw_file (one absolute path per line) and restart pi, or restart pi with BWRAP=0 to run without the sandbox."
+
 # Pi recognizes a management subcommand only as its first argument; a global
 # option inserted before it makes pi treat the subcommand as a session message.
-# Those subcommands run no agent tools, so the read-only notice does not apply.
-notice=""
+# Those subcommands run no agent tools, so no note applies.
 case "${1-}" in
 install | remove | uninstall | update | list | config | auth)
 	# Management subcommand: passed through with no notice.
+	notice=""
 	;;
 *)
 	if [ "$home_readonly" = 1 ]; then
 		echo "pi-wrapper: $cwd is read-only; scratch files go in $scratch_dir." >&2
-		notice="The working directory ($cwd) is mounted read-only because it is \$HOME or above it. Use $scratch_dir for scratch files; it is writable."
+		notice="$notice The working directory ($cwd) is mounted read-only because it is \$HOME or above it. Use $scratch_dir for scratch files; it is writable."
 	fi
 	;;
 esac
