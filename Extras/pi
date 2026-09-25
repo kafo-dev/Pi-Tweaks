@@ -57,9 +57,14 @@ cache_dir=${XDG_CACHE_HOME:-"$HOME/.cache"}
 # Global skills tree; writable so skills can be installed and updated.
 agents_dir="$HOME/.agents"
 
-# Agent scratchpad inside the agent directory. Bound read-write by default;
-# the fallback when the project directory is $HOME.
-scratch_dir="$agent_dir/scratchpad"
+# Parent of the agent directory, the default being "$HOME/.pi". Files that sit
+# beside the agent directory rather than inside it are placed here.
+pi_dir="${agent_dir%/*}"
+
+# Agent scratchpad, bound read-write on every run and the fallback when the
+# project directory is $HOME. It sits beside the agent directory (default
+# "$HOME/.pi/scratchpad"), so it follows PI_CODING_AGENT_DIR like rw-paths.txt.
+scratch_dir="$pi_dir/scratchpad"
 
 if [ "${BWRAP:-1}" = "0" ]; then
 	echo "pi-wrapper: bwrap is not isolating the agent; pi runs with full permissions." >&2
@@ -94,11 +99,11 @@ for d in "$agent_dir" "$cache_dir" "$agents_dir" "$scratch_dir"; do
 done
 
 # Extra read-write paths, one per line, next to the agent directory (default
-# "$HOME/.pi/rw-paths.txt"; follows PI_CODING_AGENT_DIR). Blank lines and lines
-# starting with '#' are ignored, '~' expands to $HOME, and a missing path is
-# skipped (--bind-try). The file is read here, on the host, so it need not be
-# reachable inside the sandbox.
-rw_file="${agent_dir%/*}/rw-paths.txt"
+# "$HOME/.pi/rw-paths.txt"). Blank lines and lines starting with '#' are
+# ignored, '~' expands to $HOME, and a missing path is skipped (--bind-try).
+# The file is read here, on the host, so it need not be reachable inside the
+# sandbox.
+rw_file="$pi_dir/rw-paths.txt"
 
 # The agent cannot see the sandbox from inside, so it is told about it. Without
 # this note a permission error reads as a broken environment, and the agent

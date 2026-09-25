@@ -43,7 +43,7 @@ need to be a system package.
 |------|-----|
 | `$PWD` | the project |
 | `$PI_CODING_AGENT_DIR` (default `~/.pi/agent`) | settings, sessions, trust, packages, auth |
-| `$PI_CODING_AGENT_DIR/scratchpad` (default `~/.pi/agent/scratchpad`) | agent scratch files; the fallback when started from `$HOME` |
+| scratchpad, beside the agent directory (default `~/.pi/scratchpad`) | agent scratch files; the fallback when started from `$HOME` |
 | `$XDG_CACHE_HOME` (default `~/.cache`) | tool caches, browser profiles |
 | `~/.agents` | global skills (`~/.agents/skills`) |
 
@@ -80,10 +80,11 @@ nothing to disk. A management subcommand starts no session and gets no note.
 
 ### Scratchpad
 
-The agent gets a scratchpad inside the agent directory, at
-`$PI_CODING_AGENT_DIR/scratchpad` (default `~/.pi/agent/scratchpad`). It is
-bound read-write on every run and is the designated place for temporary files
-when the project directory is read-only.
+The agent gets a scratchpad beside the agent directory, at `~/.pi/scratchpad`
+with the default agent directory, and bound read-write on every run. It is the
+designated place for temporary files when the project directory is read-only.
+Like `rw-paths.txt`, the path follows the parent of `PI_CODING_AGENT_DIR`, so
+moving the agent directory moves the scratchpad with it.
 
 ### Extra read-write paths
 
@@ -114,7 +115,7 @@ widen its own mounts.
 | Variable | Purpose |
 |----------|---------|
 | `BWRAP` | Set to `0` to skip the sandbox. The wrapper then warns and runs `pi` unsandboxed with the same arguments. |
-| `PI_CODING_AGENT_DIR` | Override the agent directory that is bound read-write. Default `~/.pi/agent`. Also moves `rw-paths.txt` to its parent and the scratchpad to `$PI_CODING_AGENT_DIR/scratchpad`. |
+| `PI_CODING_AGENT_DIR` | Override the agent directory that is bound read-write. Default `~/.pi/agent`. The scratchpad and `rw-paths.txt` move to its parent as well. |
 | `XDG_CACHE_HOME` | Override the cache directory that is bound read-write. Default `~/.cache`. |
 
 ### Notes and limitations
