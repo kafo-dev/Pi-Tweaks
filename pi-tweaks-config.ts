@@ -15,7 +15,7 @@
  *       "phone": "off",
  *       "device": ""
  *     },
- *     "pi-exit": { "enabled": false }
+ *     "exit-alias": { "enabled": false }
  *   }
  *
  * `"enabled": false` makes an extension register nothing. pi imports

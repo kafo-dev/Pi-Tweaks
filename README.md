@@ -42,7 +42,7 @@ extension's settings and an `enabled` switch:
       { "path": "docs/style.md", "showPathToAgent": true, "stripFrontmatter": false }
     ]
   },
-  "pi-exit": { "enabled": true }
+  "exit-alias": { "enabled": true }
 }
 ```
 
@@ -57,7 +57,7 @@ start (or `/reload`).
 | `pi-bash-timeout` | `timeoutSeconds` (default 10) |
 | `pi-notify` | `backend`, `phone`, `device`; `/notify` writes them back here |
 | `pin-document` | `documents`: paths whose full text is pinned into the system prompt |
-| `pi-exit` | `enabled` only |
+| `exit-alias` | `enabled` only |
 
 `pin-document` also reads a project file, `<cwd>/.pi/pin-document.json`, when
 the project is trusted; it takes precedence over the section. Both forms hold
@@ -100,7 +100,7 @@ that lives with the rest of the extension's settings.
 | [`pi-tweaks-config.ts`](pi-tweaks-config.ts) | Shared configuration for every extension: reads and writes `pi-tweaks.json`, applies the `enabled` switch and the per-extension settings, and validates each value. |
 | [`pi-notify/`](pi-notify/) | Extension that notifies you — desktop and KDE Connect phone alarm — when pi settles a turn or blocks on a dialog. Terminal notifications on by default, phone off. See its [README](pi-notify/README.md). |
 | [`pin-document.ts`](pin-document.ts) | Extension that appends the full text of the Markdown documents named in `pin-document.documents` to the system prompt on every turn, so they apply without the model deciding to read them. A `~` path resolves against the home directory, and any other relative path against the config file that names it. A document is appended as-is unless `showPathToAgent` or `stripFrontmatter` is true, which wraps it in a `<document>` element and, for `showPathToAgent`, writes a path into it — working-directory-relative, `~/…` under home, or absolute. The text is deterministic, which keeps it inside the provider's cached prefix. An invalid config or an unreadable document is reported as an error, and nothing is pinned for that turn. `/pi-tweaks pin-document` reports the resolved set, the byte size, and an estimated token count (four characters per token). |
-| [`pi-exit.ts`](pi-exit.ts) | Extension that adds `/exit` as an alias for pi's built-in `/quit`. |
+| [`exit-alias.ts`](exit-alias.ts) | Extension that adds `/exit` as an alias for pi's built-in `/quit`. |
 | [`pi-bash-timeout.ts`](pi-bash-timeout.ts) | Extension that fills in the built-in `bash` tool's `timeout` parameter (in seconds) when the model omits it, so a hung command cannot stall a turn. An explicit model value wins. The default is `pi-bash-timeout.timeoutSeconds` (10). |
 | [`browser-tools/`](browser-tools/) | CDP browser-automation skill. **Read [`browser-tools/NOTICE.md`](browser-tools/NOTICE.md)** for attribution and licensing before using or redistributing. |
 | [`web-tools/`](web-tools/) | Free, keyless web search through Exa's hosted MCP server, plus `web-read`, a local POSIX `sh` reader that turns a URL into LLM-friendly markdown. No API key. See its [README](web-tools/README.md). |

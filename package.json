@@ -15,7 +15,7 @@
 		"extensions": [
 			"./pi-notify/index.ts",
 			"./pi-bash-timeout.ts",
-			"./pi-exit.ts",
+			"./exit-alias.ts",
 			"./pin-document.ts",
 			"./Experiment/minimal-mode.ts"
 		],
