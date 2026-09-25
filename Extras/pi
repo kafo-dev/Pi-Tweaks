@@ -107,11 +107,17 @@ rw_file="$pi_dir/rw-paths.txt"
 
 # The agent cannot see the sandbox from inside, so it is told about it. Without
 # this note a permission error reads as a broken environment, and the agent
-# either gives up or tries to work around the mount. The note stays generic: it
-# names the sandbox, not the mounts, which the user can change between runs. Pi
-# takes the note as inline text (--append-system-prompt), so nothing has to be
+# either gives up or tries to work around the mount. The mount list itself
+# stays out of the note, because the user can change it between runs. Pi takes
+# the note as inline text (--append-system-prompt), so nothing has to be
 # written to disk.
-notice="This session runs inside a bubblewrap sandbox, which mounts most of the filesystem read-only. A write that fails with a permission or read-only-filesystem error is being blocked by the sandbox: do not try to work around the mount. Ask the user to lift the restriction on that path. On the host they can list it in $rw_file (one absolute path per line) and restart pi, or restart pi with BWRAP=0 to run without the sandbox."
+sandbox_note="This session runs inside a bubblewrap sandbox, which mounts most of the filesystem read-only. A write that fails with a permission or read-only-filesystem error is being blocked by the sandbox: do not try to work around the mount. Ask the user to lift the restriction on that path. On the host they can list it in $rw_file (one absolute path per line) and restart pi, or restart pi with BWRAP=0 to run without the sandbox."
+
+# /tmp is a private tmpfs that dies with the sandbox, and the scratchpad is
+# shared with every other agent that is running, so both need a rule.
+scratch_note="Put scratch files in $scratch_dir, never in /tmp: /tmp is a private tmpfs that is wiped whenever the agent restarts, while the scratchpad survives. Other agents may be running against the same scratchpad, so create a subdirectory of it for this session and keep every file there. Never delete the scratchpad or anything in it outside that subdirectory."
+
+notice="$sandbox_note $scratch_note"
 
 # Pi recognizes a management subcommand only as its first argument; a global
 # option inserted before it makes pi treat the subcommand as a session message.
