@@ -18,7 +18,9 @@
  * - The `bash` row is collapsed:
  *   - Collapsed: one line — `$ ` plus the command, cut to the viewport width,
  *     and no output.
- *   - Expanded (`ctrl+o`): the full command in the same row, then the output.
+ *   - Expanded (`ctrl+o`, or a click on the row): the full command in the same
+ *     row, then the output. The click is handled by the row, so it also works
+ *     while the command is still streaming, before pi gives the call a result.
  *   - The collapsed row shows no output, successful or failed; a non-zero exit
  *     appears only in the suffix.
  *   - The command line ends with `(<time>, exit <code>, ~<tokens> tokens)`,
@@ -66,8 +68,10 @@ import {
 	truncateTail,
 } from "@earendil-works/pi-coding-agent";
 import {
+	MouseRegion,
 	sliceByColumn,
 	Text,
+	type TuiMouseEvent,
 	truncateToWidth,
 	visibleWidth,
 } from "@earendil-works/pi-tui";
@@ -414,6 +418,53 @@ function boundedBashTool(
 	};
 }
 
+/** Row-local expansion state, shared by the call and result slots. */
+interface RowState {
+	/** Effective expansion for this row. */
+	expanded?: boolean;
+	/** The last `context.expanded` seen, to notice a `ctrl+o` change. */
+	global?: boolean;
+}
+
+/** The slice of the render context that row expansion needs. */
+interface RowContext {
+	state: RowState;
+	expanded: boolean;
+	invalidate: () => void;
+}
+
+/**
+ * Whether the row shows the full command and its output.
+ *
+ * `ctrl+o` owns `context.expanded`, while a click writes the row-local value,
+ * so the two are resynced whenever the global flag changes.
+ */
+function rowExpanded(context: RowContext): boolean {
+	const state = context.state;
+	if (state.global !== context.expanded) {
+		state.global = context.expanded;
+		state.expanded = context.expanded;
+	}
+	return state.expanded ?? context.expanded;
+}
+
+/**
+ * Toggle the row from a left click.
+ *
+ * Pi hands a click to `renderCall`'s component only once the call has a result,
+ * so a row that leaves the click to pi cannot be expanded while the command is
+ * still streaming. Handling the click here keeps the row toggleable for the
+ * whole life of the call.
+ */
+function rowClick(context: RowContext) {
+	return (event: TuiMouseEvent) => {
+		if (event.type !== "click" || event.button !== "left") return undefined;
+		context.state.expanded = !rowExpanded(context);
+		context.invalidate();
+		return { handled: true };
+	};
+}
+
 type BashRenderers = Pick<
 	ToolDefinition<typeof BASH_PARAMETERS, BashToolDetails | undefined>,
 	"renderCall" | "renderResult"
@@ -443,7 +494,8 @@ export default function (pi: ExtensionAPI) {
 
 	const renderers: BashRenderers = {
 		// The row is re-rendered on every expand toggle, so the command can grow
-		// in place and the result slot stays free of it.
+		// in place and the result slot stays free of it. The click is handled on
+		// the row itself so it also works before the call has a result.
 		renderCall(args, theme, context) {
 			const prefix = `${theme.fg("toolTitle", theme.bold("$"))} `;
 			const info = bashMeta.get(context.toolCallId);
@@ -460,31 +512,36 @@ export default function (pi: ExtensionAPI) {
 			const suffix =
 				parts.length > 0 ? theme.fg("muted", ` (${parts.join(", ")})`) : "";
 			const command = args.command ?? "";
+			const onMouse = rowClick(context);
 
 			// Expanded keeps the whole command, which may wrap. Collapsed fills
 			// one line and cuts the command, never the suffix.
-			if (context.expanded) {
-				return new Text(
-					`${prefix}${theme.fg("accent", command.trim())}${suffix}`,
-					0,
-					0,
+			if (rowExpanded(context)) {
+				return new MouseRegion(
+					new Text(
+						`${prefix}${theme.fg("accent", command.trim())}${suffix}`,
+						0,
+						0,
+					),
+					onMouse,
 				);
 			}
-			return new BashCallRow(prefix, collapse(command), suffix, (text) =>
-				theme.fg("accent", text),
+			return new MouseRegion(
+				new BashCallRow(prefix, collapse(command), suffix, (text) =>
+					theme.fg("accent", text),
+				),
+				onMouse,
 			);
 		},
 
-		renderResult(result, { expanded }, theme) {
+		renderResult(result, _options, theme, context) {
 			const output = resultText(result);
 
-			if (!expanded) {
+			if (!rowExpanded(context) || !output) {
 				return new Text("", 0, 0);
 			}
 
-			return output
-				? new Text(theme.fg("toolOutput", output), 0, 0)
-				: new Text("", 0, 0);
+			return new Text(theme.fg("toolOutput", output), 0, 0);
 		},
 	};
 

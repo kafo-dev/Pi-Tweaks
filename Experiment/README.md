@@ -52,8 +52,10 @@ timeout is 32 seconds.
 
 The `bash` row is collapsed. The collapsed row holds `$ ` and the command,
 whitespace collapsed to a single line and cut to the viewport width, and no
-output, successful or failed. Expanding the row with `ctrl+o` untruncates the
-command in place and shows the full output below it.
+output, successful or failed. Expanding the row with `ctrl+o`, or by clicking it,
+untruncates the command in place and shows the full output below it. The
+click is handled by the row itself, so it also works while the command is
+still streaming, before the call has a result.
 
 The command line ends with the command's wall-clock time rounded to the
 nearest second in Go's `time.Duration` format, its exit code, and an output
