@@ -58,6 +58,7 @@ start (or `/reload`).
 | `pi-notify` | `backend`, `phone`, `device`; `/notify` writes them back here |
 | `pin-document` | `documents`: paths whose full text is pinned into the system prompt |
 | `exit-alias` | `enabled` only |
+| `pi-tweaks` | `enabled` only; the `/pi-tweaks` command itself |
 
 `pin-document` also reads a project file, `<cwd>/.pi/pin-document.json`, when
 the project is trusted; it takes precedence over the section. Both forms hold
@@ -92,11 +93,28 @@ pi's own `pi config` command can also enable or disable an installed
 extension through `settings.json`; `enabled` in `pi-tweaks.json` is the switch
 that lives with the rest of the extension's settings.
 
+## The `/pi-tweaks` command
+
+[`pi-tweaks.ts`](pi-tweaks.ts) registers one command for the whole package:
+
+```
+/pi-tweaks list           every packaged extension, and whether it is enabled
+/pi-tweaks pin-document   the documents pin-document resolves, and its errors
+```
+
+`list` is the command's own subcommand: it reads `pi.extensions` and the
+sections above, so it names the extensions whose switch is off and the ones
+whose section `pi-tweaks.json` lacks. A subcommand is named after the extension
+that answers it and calls a function that extension exports; a subcommand whose
+extension is off says so instead of reporting work that would not happen. On
+its own, `/pi-tweaks` prints the subcommands that are available.
+
 ## Contents
 
 | Path | What |
 |------|------|
 | [`package.json`](package.json) | pi package manifest (`pi.extensions`, `pi.skills`) + dependencies |
+| [`pi-tweaks.ts`](pi-tweaks.ts) | Extension that registers the package's `/pi-tweaks` command: `list` for the extensions and their switches, plus one subcommand per extension that reports something. |
 | [`pi-tweaks-config.ts`](pi-tweaks-config.ts) | Shared configuration for every extension: reads and writes `pi-tweaks.json`, applies the `enabled` switch and the per-extension settings, and validates each value. |
 | [`pi-notify/`](pi-notify/) | Extension that notifies you — desktop and KDE Connect phone alarm — when pi settles a turn or blocks on a dialog. Terminal notifications on by default, phone off. See its [README](pi-notify/README.md). |
 | [`pin-document.ts`](pin-document.ts) | Extension that appends the full text of the Markdown documents named in `pin-document.documents` to the system prompt on every turn, so they apply without the model deciding to read them. A `~` path resolves against the home directory, and any other relative path against the config file that names it. A document is appended as-is unless `showPathToAgent` or `stripFrontmatter` is true, which wraps it in a `<document>` element and, for `showPathToAgent`, writes a path into it — working-directory-relative, `~/…` under home, or absolute. The text is deterministic, which keeps it inside the provider's cached prefix. An invalid config or an unreadable document is reported as an error, and nothing is pinned for that turn. `/pi-tweaks pin-document` reports the resolved set, the byte size, and an estimated token count (four characters per token). |

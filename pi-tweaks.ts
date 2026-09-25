@@ -1,0 +1,132 @@
+/**
+ * pi-tweaks — the package's own `/pi-tweaks` command.
+ *
+ * One entry point for every extension of the package:
+ *
+ *   /pi-tweaks list           the packaged extensions, split by enabled state
+ *   /pi-tweaks pin-document   the documents pin-document resolves
+ *
+ * A subcommand is named after the extension that answers it, and that
+ * extension exports the report as a plain function; this file imports it.
+ * Extensions cannot share module state: pi loads each one with its own module
+ * cache, so a registry filled in at load time would stay empty here. Adding a
+ * subcommand means adding the extension's report to SUBCOMMANDS below.
+ *
+ * `list` is the command's own: it reads `pi.extensions` and answers whether
+ * each extension would register anything. A subcommand whose extension is off
+ * says so, rather than report work that extension would not do.
+ * `"enabled": false` under `pi-tweaks` in `pi-tweaks.json` removes the whole
+ * command.
+ */
+
+import type {
+	ExtensionAPI,
+	ExtensionCommandContext,
+} from "@earendil-works/pi-coding-agent";
+import {
+	configFilePath,
+	isExtensionEnabled,
+	isPackagedExtensionEnabled,
+	packagedExtensions,
+} from "./pi-tweaks-config";
+import { reportPinnedDocuments } from "./pin-document";
+
+const EXTENSION = "pi-tweaks";
+
+/** One `/pi-tweaks` subcommand, answered by an extension of the package. */
+type Subcommand = {
+	/** What the subcommand reports, one line for the usage text. */
+	description: string;
+	/** Print the report. */
+	handler: (ctx: ExtensionCommandContext) => void;
+};
+
+/**
+ * Every subcommand but `list`, in usage order. The key is the section name of
+ * the extension that answers it, in `pi-tweaks.json`, so the enabled switch
+ * and this table agree by construction.
+ */
+const SUBCOMMANDS: Array<[name: string, subcommand: Subcommand]> = [
+	[
+		"pin-document",
+		{
+			description: "the documents pin-document resolves, and its errors",
+			handler: reportPinnedDocuments,
+		},
+	],
+];
+
+/** Whether the extension named here registers anything: off, on, or unknown. */
+function extensionState(name: string): boolean | undefined {
+	const extension = packagedExtensions()?.find((entry) => entry.name === name);
+	return extension ? isPackagedExtensionEnabled(extension) : undefined;
+}
+
+/** Report whether each packaged extension registers anything. */
+function list(ctx: ExtensionCommandContext): void {
+	const extensions = packagedExtensions();
+	if (extensions === null) {
+		ctx.ui.notify(
+			"pi-tweaks: no usable list of extensions under `pi.extensions` in the package.json beside this file",
+			"error",
+		);
+		return;
+	}
+	const named = (on: boolean) =>
+		extensions
+			.filter((extension) => isPackagedExtensionEnabled(extension) === on)
+			.map((extension) => extension.name);
+	const enabled = named(true);
+	const disabled = named(false);
+	const listed = (names: string[]) =>
+		names.length > 0 ? names.join(", ") : "none";
+	ctx.ui.notify(
+		[
+			`config: ${configFilePath()}`,
+			`enabled (${enabled.length} of ${extensions.length}): ${listed(enabled)}`,
+			`disabled: ${listed(disabled)}`,
+		].join("\n"),
+		"info",
+	);
+}
+
+/** The usage text, built from the subcommands this file knows. */
+function usage(): string {
+	const lines = [
+		"Usage: /pi-tweaks <subcommand>",
+		`  ${"list".padEnd(15)}every packaged extension, and whether it is enabled`,
+	];
+	for (const [name, subcommand] of SUBCOMMANDS) {
+		lines.push(`  ${name.padEnd(15)}${subcommand.description}`);
+	}
+	return lines.join("\n");
+}
+
+export default function piTweaks(pi: ExtensionAPI) {
+	if (!isExtensionEnabled(EXTENSION)) return;
+
+	pi.registerCommand("pi-tweaks", {
+		description: "Tweaks: report what the packaged extensions are doing",
+		handler: async (args, ctx) => {
+			const [name = ""] = args.trim().split(/\s+/);
+			if (name === "list") {
+				list(ctx);
+				return;
+			}
+			const match = SUBCOMMANDS.find(([candidate]) => candidate === name);
+			if (match === undefined) {
+				ctx.ui.notify(usage(), name === "" ? "info" : "warning");
+				return;
+			}
+			const [subcommandName, subcommand] = match;
+			if (extensionState(subcommandName) === false) {
+				ctx.ui.notify(
+					`${subcommandName} is disabled in ${configFilePath()}`,
+					"warning",
+				);
+				return;
+			}
+			subcommand.handler(ctx);
+		},
+	});
+}

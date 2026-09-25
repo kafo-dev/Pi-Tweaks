@@ -83,6 +83,59 @@ export function isExperimentEnabled(extension: string): boolean {
 	return readSection(extension)?.enabled === true;
 }
 
+/** One extension the package ships, in `pi.extensions` order. */
+export type PackagedExtension = {
+	/** Section name in `pi-tweaks.json`, taken from the file name. */
+	name: string;
+	/** Path as written in `pi.extensions`, from the package root. */
+	path: string;
+	/** Whether the file lives in `Experiment/`, where a section defaults off. */
+	experiment: boolean;
+};
+
+/**
+ * Section name and kind of an extension, from its `pi.extensions` path. The
+ * name follows the file: the `.ts` suffix goes, `index` stands for its
+ * directory, and an `Experiment/` file keeps that directory as a prefix, so
+ * `Experiment/minimal-mode.ts` is `experiment-minimal-mode`.
+ */
+function parseExtensionPath(path: string): PackagedExtension {
+	const bare = path.replace(/^\.\//, "").replace(/\.ts$/, "");
+	const parts = bare.split("/");
+	const experiment = parts.length > 1 && parts[0] === "Experiment";
+	const file = (experiment ? parts.slice(1) : parts).join("/");
+	const name = file.endsWith("/index") ? file.slice(0, -"/index".length) : file;
+	return { name: experiment ? `experiment-${name}` : name, path, experiment };
+}
+
+/**
+ * Every extension in the package manifest, read from the `package.json` beside
+ * this module. `null` when that file is missing or unreadable, or when
+ * `pi.extensions` is absent or holds a non-string entry.
+ */
+export function packagedExtensions(): PackagedExtension[] | null {
+	try {
+		const manifest = JSON.parse(
+			readFileSync(join(import.meta.dirname, "package.json"), "utf8"),
+		) as { pi?: { extensions?: unknown } };
+		const paths = manifest.pi?.extensions;
+		if (!Array.isArray(paths)) return null;
+		if (!paths.every((path) => typeof path === "string")) return null;
+		return (paths as string[]).map(parseExtensionPath);
+	} catch {
+		return null;
+	}
+}
+
+/** Whether one extension of the package registers anything. */
+export function isPackagedExtensionEnabled(
+	extension: PackagedExtension,
+): boolean {
+	return extension.experiment
+		? isExperimentEnabled(extension.name)
+		: isExtensionEnabled(extension.name);
+}
+
 /** Replace the given keys of one section, preserving the rest of the file. */
 export function updateSection(extension: string, values: Section): void {
 	const path = configFilePath();

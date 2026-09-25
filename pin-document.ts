@@ -37,7 +37,8 @@
  * An invalid config, an invalid entry, or a document that cannot be read is an
  * error: nothing is pinned for that turn and the error is reported in the UI.
  * A config that does not exist at all is not an error; the extension is simply
- * off. Run /pi-tweaks pin-document to inspect the resolved set.
+ * off. Run /pi-tweaks pin-document to inspect the resolved set; the command
+ * lives in pi-tweaks.ts and calls reportPinnedDocuments below.
  * `"enabled": false` turns the extension off.
  */
 
@@ -47,6 +48,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import {
 	CONFIG_DIR_NAME,
 	type ExtensionAPI,
+	type ExtensionCommandContext,
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import {
@@ -254,6 +256,50 @@ function describeProblem(
 	return lines.join("\n");
 }
 
+/** Report what `/pi-tweaks pin-document` resolves, for the package's command. */
+export function reportPinnedDocuments(ctx: ExtensionCommandContext): void {
+	const resolved = resolveConfig(ctx);
+	if (resolved.kind === "missing") {
+		ctx.ui.notify(
+			`No ${PROJECT_FILE} or ${EXTENSION}.${DOCUMENTS_KEY} found`,
+			"warning",
+		);
+		return;
+	}
+	if (resolved.kind === "malformed") {
+		ctx.ui.notify(
+			`pin-document: ${resolved.path} is not a list of documents`,
+			"error",
+		);
+		return;
+	}
+
+	const { text, missing } = build(
+		resolved.documents,
+		dirname(resolved.configPath),
+		ctx.cwd,
+	);
+	const total = resolved.documents.length;
+	// Rule of thumb: four characters per token.
+	const tokens = Math.ceil(text.length / 4);
+	const failed = missing.length > 0 || resolved.invalid.length > 0;
+	const lines = [
+		`config: ${resolved.configPath}`,
+		`pinned: ${total}`,
+		`resolved: ${total - missing.length} of ${total}`,
+		failed
+			? "appended: none (errors below)"
+			: `appended: ${Buffer.byteLength(text)} bytes (~${tokens} tokens)`,
+	];
+	if (missing.length > 0) lines.push(`missing: ${missing.join(", ")}`);
+	if (resolved.invalid.length > 0) {
+		lines.push(
+			`invalid entries (need path, showPathToAgent, and stripFrontmatter): ${resolved.invalid.join(", ")}`,
+		);
+	}
+	ctx.ui.notify(lines.join("\n"), failed ? "error" : "info");
+}
+
 export default function pinDocument(pi: ExtensionAPI) {
 	if (!isExtensionEnabled(EXTENSION)) return;
 
@@ -285,58 +331,5 @@ export default function pinDocument(pi: ExtensionAPI) {
 		if (text.length === 0) return;
 
 		return { systemPrompt: `${event.systemPrompt}\n\n${text}\n` };
-	});
-
-	pi.registerCommand("pi-tweaks", {
-		description:
-			"Tweaks: pin-document reports pinned documents and unresolved paths",
-		handler: async (args, ctx) => {
-			const [subcommand = ""] = args.trim().split(/\s+/);
-			if (subcommand !== "pin-document") {
-				ctx.ui.notify("Usage: /pi-tweaks pin-document", "warning");
-				return;
-			}
-
-			const resolved = resolveConfig(ctx);
-			if (resolved.kind === "missing") {
-				ctx.ui.notify(
-					`No ${PROJECT_FILE} or ${EXTENSION}.${DOCUMENTS_KEY} found`,
-					"warning",
-				);
-				return;
-			}
-			if (resolved.kind === "malformed") {
-				ctx.ui.notify(
-					`pin-document: ${resolved.path} is not a list of documents`,
-					"error",
-				);
-				return;
-			}
-
-			const { text, missing } = build(
-				resolved.documents,
-				dirname(resolved.configPath),
-				ctx.cwd,
-			);
-			const total = resolved.documents.length;
-			// Rule of thumb: four characters per token.
-			const tokens = Math.ceil(text.length / 4);
-			const failed = missing.length > 0 || resolved.invalid.length > 0;
-			const lines = [
-				`config: ${resolved.configPath}`,
-				`pinned: ${total}`,
-				`resolved: ${total - missing.length} of ${total}`,
-				failed
-					? "appended: none (errors below)"
-					: `appended: ${Buffer.byteLength(text)} bytes (~${tokens} tokens)`,
-			];
-			if (missing.length > 0) lines.push(`missing: ${missing.join(", ")}`);
-			if (resolved.invalid.length > 0) {
-				lines.push(
-					`invalid entries (need path, showPathToAgent, and stripFrontmatter): ${resolved.invalid.join(", ")}`,
-				);
-			}
-			ctx.ui.notify(lines.join("\n"), failed ? "error" : "info");
-		},
 	});
 }

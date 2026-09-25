@@ -13,6 +13,7 @@
 	],
 	"pi": {
 		"extensions": [
+			"./pi-tweaks.ts",
 			"./pi-notify/index.ts",
 			"./pi-bash-timeout.ts",
 			"./exit-alias.ts",
