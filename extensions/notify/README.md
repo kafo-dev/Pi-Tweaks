@@ -25,8 +25,8 @@ updating.
 work straight away, and no phone is rung until one is set. Settings live in the
 `notify` section of `pi-tweaks.json` in pi's agent directory
 (`$PI_CODING_AGENT_DIR/pi-tweaks.json`, or `~/.pi/agent/pi-tweaks.json`).
-`/notify` creates and updates that section; the other sections and the
-`enabled` switch are preserved.
+`/pi-tweaks notify` creates and updates that section; the other sections and
+the `enabled` switch are preserved.
 
 ```json
 {
@@ -49,12 +49,15 @@ Set `"enabled": false` to turn the extension off.
 
 ## Commands
 
+The extension registers no command of its own; the package's `/pi-tweaks`
+command answers it. Each call reads the section and writes it back.
+
 ```
-/notify                      show settings and the file path
-/notify backend <value>
-/notify phone <value>
-/notify device <id|auto>
-/notify-test                 fire a dialog, so you can hear the whole path
+/pi-tweaks notify                     show settings and the file path
+/pi-tweaks notify backend <value>
+/pi-tweaks notify phone <value>
+/pi-tweaks notify device <id|auto>
+/pi-tweaks notify test                fire a dialog, so the whole path is heard
 ```
 
 ## Requirements

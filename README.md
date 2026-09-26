@@ -55,7 +55,7 @@ start (or `/reload`).
 | Section | Settings |
 |---------|----------|
 | `pi-bash-timeout` | `timeoutSeconds` (default 10) |
-| `notify` | `backend`, `phone`, `device`; `/notify` writes them back here |
+| `notify` | `backend`, `phone`, `device`; `/pi-tweaks notify` writes them back here |
 | `pin-document` | `documents`: paths whose full text is pinned into the system prompt |
 | `exit-alias` | `enabled` only |
 | `pi-tweaks` | `enabled` only; the `/pi-tweaks` command itself |
@@ -83,8 +83,8 @@ directory when the document is under it, `~/…` when it is under the home
 directory, and absolute otherwise. With both false the document text is
 appended as-is.
 
-Settings written by an extension (`/notify`) merge into the file, so the other
-sections and the `enabled` switch survive.
+Settings written by an extension (`/pi-tweaks notify`) merge into the file, so
+the other sections and the `enabled` switch survive.
 
 pi's own `pi config` command can also enable or disable an installed
 extension through `settings.json`; `enabled` in `pi-tweaks.json` is the switch
@@ -95,8 +95,9 @@ that lives with the rest of the extension's settings.
 [`pi-tweaks.ts`](extensions/pi-tweaks.ts) registers one command for the whole package:
 
 ```
-/pi-tweaks list           every packaged extension, and whether it is enabled
-/pi-tweaks pin-document   the documents pin-document resolves, and its errors
+/pi-tweaks list              every packaged extension, and whether it is enabled
+/pi-tweaks notify …          the notify settings, and a test dialog
+/pi-tweaks pin-document      the documents pin-document resolves, and its errors
 ```
 
 `list` is the command's own subcommand: it reads `pi.extensions` and the

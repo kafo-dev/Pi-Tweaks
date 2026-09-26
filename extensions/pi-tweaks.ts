@@ -3,14 +3,15 @@
  *
  * One entry point for every extension of the package:
  *
- *   /pi-tweaks list           the packaged extensions, split by enabled state
- *   /pi-tweaks pin-document   the documents pin-document resolves
+ *   /pi-tweaks list              the packaged extensions, split by enabled state
+ *   /pi-tweaks notify …          the notify extension's settings and test
+ *   /pi-tweaks pin-document      the documents pin-document resolves
  *
  * A subcommand is named after the extension that answers it, and that
- * extension exports the report as a plain function; this file imports it.
+ * extension exports the work as a plain function; this file imports it.
  * Extensions cannot share module state: pi loads each one with its own module
- * cache, so a registry filled in at load time would stay empty here. Adding a
- * subcommand means adding the extension's report to SUBCOMMANDS below.
+ * cache, so a value read here is not the copy the extension itself uses.
+ * Everything a subcommand needs is therefore read from disk at call time.
  *
  * `list` is the command's own: it reads `pi.extensions` and answers whether
  * each extension would register anything. A subcommand whose extension is off
@@ -29,6 +30,7 @@ import {
 	isPackagedExtensionEnabled,
 	packagedExtensions,
 } from "../lib/pi-tweaks-config";
+import { runNotify } from "./notify/index";
 import { reportPinnedDocuments } from "./pin-document";
 
 const EXTENSION = "pi-tweaks";
@@ -37,8 +39,8 @@ const EXTENSION = "pi-tweaks";
 type Subcommand = {
 	/** What the subcommand reports, one line for the usage text. */
 	description: string;
-	/** Print the report. */
-	handler: (ctx: ExtensionCommandContext) => void;
+	/** Run the subcommand with the text that followed its name. */
+	handler: (args: string, ctx: ExtensionCommandContext) => void | Promise<void>;
 };
 
 /**
@@ -48,10 +50,17 @@ type Subcommand = {
  */
 const SUBCOMMANDS: Array<[name: string, subcommand: Subcommand]> = [
 	[
+		"notify",
+		{
+			description: "notify settings: show one, change one, or test the path",
+			handler: runNotify,
+		},
+	],
+	[
 		"pin-document",
 		{
 			description: "the documents pin-document resolves, and its errors",
-			handler: reportPinnedDocuments,
+			handler: (_args, ctx) => reportPinnedDocuments(ctx),
 		},
 	],
 ];
@@ -94,10 +103,10 @@ function list(ctx: ExtensionCommandContext): void {
 function usage(): string {
 	const lines = [
 		"Usage: /pi-tweaks <subcommand>",
-		`  ${"list".padEnd(15)}every packaged extension, and whether it is enabled`,
+		`  ${"list".padEnd(16)}every packaged extension, and whether it is enabled`,
 	];
 	for (const [name, subcommand] of SUBCOMMANDS) {
-		lines.push(`  ${name.padEnd(15)}${subcommand.description}`);
+		lines.push(`  ${name.padEnd(16)}${subcommand.description}`);
 	}
 	return lines.join("\n");
 }
@@ -108,7 +117,11 @@ export default function piTweaks(pi: ExtensionAPI) {
 	pi.registerCommand("pi-tweaks", {
 		description: "Tweaks: report what the packaged extensions are doing",
 		handler: async (args, ctx) => {
-			const [name = ""] = args.trim().split(/\s+/);
+			const trimmed = args.trim();
+			const space = trimmed.search(/\s/);
+			const name = space === -1 ? trimmed : trimmed.slice(0, space);
+			const rest = space === -1 ? "" : trimmed.slice(space + 1);
+
 			if (name === "list") {
 				list(ctx);
 				return;
@@ -126,7 +139,7 @@ export default function piTweaks(pi: ExtensionAPI) {
 				);
 				return;
 			}
-			subcommand.handler(ctx);
+			await subcommand.handler(rest, ctx);
 		},
 	});
 }
