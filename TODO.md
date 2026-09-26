@@ -34,3 +34,8 @@ Risks and reasons not to do it yet:
 Revisit when pi exposes a session-selection hook, such as an event result for
 `session_start` carrying a session path, or `switchSession` on
 `ExtensionContext` with a documented safe point for startup.
+
+## Read the agent-stuff browser skill
+
+Check https://github.com/mitsuhiko/agent-stuff/blob/main/skills/web-browser
+against `skills/browser-tools` and `skills/web-tools` here.
