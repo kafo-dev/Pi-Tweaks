@@ -14,7 +14,7 @@
 	"pi": {
 		"extensions": [
 			"./extensions/pi-tweaks.ts",
-			"./extensions/pi-notify/index.ts",
+			"./extensions/notify/index.ts",
 			"./extensions/pi-bash-timeout.ts",
 			"./extensions/exit-alias.ts",
 			"./extensions/pin-document.ts",

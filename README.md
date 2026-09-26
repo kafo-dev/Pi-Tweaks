@@ -15,8 +15,8 @@ The `pi` manifest in [`package.json`](package.json) declares the resources; pi
 installs the dependencies and discovers each skill's `SKILL.md` plus every
 extension listed in `pi.extensions`. The skills load on demand and are available
 as `/skill:browser-tools` and `/skill:web-tools`; the packaged extensions are
-loaded at startup. `pi-notify` notifies on the terminal out of the box, while
-its phone leg stays off until you configure it. The experimental extensions in
+loaded at startup. `notify` alerts on the terminal out of the box; its phone
+leg stays off until configured. The experimental extensions in
 `extensions/experiments/` are loaded too, but each registers nothing until its
 section is enabled in `pi-tweaks.json` (`experiment-minimal-mode`).
 
@@ -30,7 +30,7 @@ extension's settings and an `enabled` switch:
 ```json
 {
   "pi-bash-timeout": { "enabled": true, "timeoutSeconds": 10 },
-  "pi-notify": {
+  "notify": {
     "enabled": true,
     "backend": "termcodes",
     "phone": "off",
@@ -55,7 +55,7 @@ start (or `/reload`).
 | Section | Settings |
 |---------|----------|
 | `pi-bash-timeout` | `timeoutSeconds` (default 10) |
-| `pi-notify` | `backend`, `phone`, `device`; `/notify` writes them back here |
+| `notify` | `backend`, `phone`, `device`; `/notify` writes them back here |
 | `pin-document` | `documents`: paths whose full text is pinned into the system prompt |
 | `exit-alias` | `enabled` only |
 | `pi-tweaks` | `enabled` only; the `/pi-tweaks` command itself |
@@ -84,10 +84,7 @@ directory, and absolute otherwise. With both false the document text is
 appended as-is.
 
 Settings written by an extension (`/notify`) merge into the file, so the other
-sections and the `enabled` switch survive. An extension that had its own file
-before — `pi-notify.json` — is still read for backward compatibility until the
-matching section exists; the first write migrates the settings into
-`pi-tweaks.json`.
+sections and the `enabled` switch survive.
 
 pi's own `pi config` command can also enable or disable an installed
 extension through `settings.json`; `enabled` in `pi-tweaks.json` is the switch
@@ -116,7 +113,7 @@ its own, `/pi-tweaks` prints the subcommands that are available.
 | [`package.json`](package.json) | pi package manifest (`pi.extensions`, `pi.skills`) + dependencies |
 | [`extensions/pi-tweaks.ts`](extensions/pi-tweaks.ts) | Extension that registers the package's `/pi-tweaks` command: `list` for the extensions and their switches, plus one subcommand per extension that reports something. |
 | [`lib/pi-tweaks-config.ts`](lib/pi-tweaks-config.ts) | Shared configuration for every extension: reads and writes `pi-tweaks.json`, applies the `enabled` switch and the per-extension settings, and validates each value. |
-| [`extensions/pi-notify/`](extensions/pi-notify/) | Extension that notifies you — desktop and KDE Connect phone alarm — when pi settles a turn or blocks on a dialog. Terminal notifications on by default, phone off. See its [README](extensions/pi-notify/README.md). |
+| [`extensions/notify/`](extensions/notify/) | Extension that alerts on a desktop and, optionally, a KDE Connect phone when pi settles a turn or blocks on a dialog. Terminal notifications on by default, phone off. See its [README](extensions/notify/README.md). |
 | [`extensions/pin-document.ts`](extensions/pin-document.ts) | Extension that appends the full text of the Markdown documents named in `pin-document.documents` to the system prompt on every turn, so they apply without the model deciding to read them. A `~` path resolves against the home directory, and any other relative path against the config file that names it. A document is appended as-is unless `showPathToAgent` or `stripFrontmatter` is true, which wraps it in a `<document>` element and, for `showPathToAgent`, writes a path into it — working-directory-relative, `~/…` under home, or absolute. The text is deterministic, which keeps it inside the provider's cached prefix. An invalid config or an unreadable document is reported as an error, and nothing is pinned for that turn. `/pi-tweaks pin-document` reports the resolved set, the byte size, and an estimated token count (four characters per token). |
 | [`extensions/exit-alias.ts`](extensions/exit-alias.ts) | Extension that adds `/exit` as an alias for pi's built-in `/quit`. |
 | [`extensions/pi-bash-timeout.ts`](extensions/pi-bash-timeout.ts) | Extension that fills in the built-in `bash` tool's `timeout` parameter (in seconds) when the model omits it, so a hung command cannot stall a turn. An explicit model value wins. The default is `pi-bash-timeout.timeoutSeconds` (10). |
@@ -131,7 +128,7 @@ its own, `/pi-tweaks` prints the subcommands that are available.
 Subproject setup, usage, patches, and licensing live in each subdirectory —
 see [`skills/browser-tools/README.md`](skills/browser-tools/README.md),
 [`skills/web-tools/README.md`](skills/web-tools/README.md), and
-[`extensions/pi-notify/README.md`](extensions/pi-notify/README.md).
+[`extensions/notify/README.md`](extensions/notify/README.md).
 
 ## AI usage
 

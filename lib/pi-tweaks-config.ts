@@ -9,7 +9,7 @@
  * section holds that extension's settings and an optional `enabled` switch:
  *
  *   {
- *     "pi-notify": {
+ *     "notify": {
  *       "enabled": true,
  *       "backend": "termcodes",
  *       "phone": "off",
@@ -104,7 +104,7 @@ function parseExtensionPath(path: string): PackagedExtension {
 	const parts = bare.split("/");
 	// Extensions live under `extensions/`, experiments under a further
 	// `experiments/` there. The section name drops both directory levels:
-	// `extensions/pi-notify/index.ts` is `pi-notify`, and
+	// `extensions/notify/index.ts` is `notify`, and
 	// `extensions/experiments/minimal-mode.ts` is `experiment-minimal-mode`.
 	const afterRoot = parts[0] === "extensions" ? parts.slice(1) : parts;
 	const experiment = afterRoot.length > 1 && afterRoot[0] === "experiments";

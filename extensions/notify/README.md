@@ -1,17 +1,17 @@
-# pi-notify
+# notify
 
-Alerts you when pi stops and needs you: a desktop notification, and optionally
-an alarm on your phone over KDE Connect.
+Alerts when pi stops and needs attention: a desktop notification, and
+optionally an alarm on a phone over KDE Connect.
 
 | Event | When |
 |-------|------|
-| `agent_settled` | pi finished the turn and is waiting for your reply |
+| `agent_settled` | pi finished the turn and is waiting for a reply |
 | `ui_prompt_start` | pi is blocked on a confirm / select / input / editor dialog |
 
 An abort does not suppress the alert by itself. The retired `pi-stop` extension
-announced its aborts with an event on pi's shared event bus, and pi-notify
-skips the settle that event names; Escape and Ctrl+C abort the same way
-without announcing it, so they alert like any other settle.
+announced its aborts with an event on pi's shared event bus, and `notify` skips
+the settle that event names; Escape and Ctrl+C abort the same way without
+announcing it, so they alert like any other settle.
 
 ## Install
 
@@ -21,16 +21,16 @@ updating.
 
 ## Configure
 
-`backend` defaults to `termcodes` and `phone` to `off`: you get terminal
-notifications straight away, and no phone is rung until you set one. Settings
-live in the `pi-notify` section of `pi-tweaks.json` in pi's agent directory
+`backend` defaults to `termcodes` and `phone` to `off`: terminal notifications
+work straight away, and no phone is rung until one is set. Settings live in the
+`notify` section of `pi-tweaks.json` in pi's agent directory
 (`$PI_CODING_AGENT_DIR/pi-tweaks.json`, or `~/.pi/agent/pi-tweaks.json`).
 `/notify` creates and updates that section; the other sections and the
 `enabled` switch are preserved.
 
 ```json
 {
-  "pi-notify": {
+  "notify": {
     "enabled": true,
     "backend": "termcodes",
     "phone": "ring",
@@ -39,9 +39,7 @@ live in the `pi-notify` section of `pi-tweaks.json` in pi's agent directory
 }
 ```
 
-Set `"enabled": false` to turn the extension off. The old `pi-notify.json` is
-still read until the section exists; the first `/notify` write migrates the
-settings into `pi-tweaks.json`.
+Set `"enabled": false` to turn the extension off.
 
 | Key | Values | Meaning |
 |-----|--------|---------|
@@ -67,4 +65,4 @@ settings into `pi-tweaks.json`.
 
 Missing tools are not an error: the call simply fails silently, so pi is never
 blocked by a broken notifier. Headless runs (`-p`, `--mode json`, subagents)
-never notify — `ctx.hasUI` is false there, so a script cannot ring your phone.
+never notify — `ctx.hasUI` is false there, so a script cannot ring a phone.

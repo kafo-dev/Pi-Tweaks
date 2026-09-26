@@ -1,15 +1,15 @@
 /**
- * pi-notify — alert the user when pi needs them.
+ * notify — alert the user when pi needs them.
  *
  * Events:
  *   agent_settled    pi finished the turn and is waiting for your reply
  *   ui_prompt_start  pi is blocked on a confirm/select/input/editor dialog
  *
- * Config: the `pi-notify` section of `pi-tweaks.json` (see
+ * Config: the `notify` section of `pi-tweaks.json` (see
  * pi-tweaks-config.ts).
  *
  *   {
- *     "pi-notify": {
+ *     "notify": {
  *       "enabled": true,
  *       "backend": "off" | "termcodes" | "notify-send",
  *       "phone":   "off" | "ping" | "ring",
@@ -20,9 +20,7 @@
  * `backend` defaults to "termcodes" and `phone` to "off": installing the
  * package gives you terminal notifications immediately, and no phone is rung
  * until you ask for one. `"enabled": false` turns the extension off. `/notify`
- * writes changes back to that file. The old `pi-notify.json` is still read
- * until the `pi-notify` section exists; the first write migrates the settings
- * and the old file is ignored from then on.
+ * writes changes back to that file.
  *
  * Commands:
  *   /notify                      show settings
@@ -40,24 +38,19 @@
  */
 
 import { execFile } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import {
-	type ExtensionAPI,
-	type ExtensionContext,
-	getAgentDir,
+import type {
+	ExtensionAPI,
+	ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import {
 	configFilePath,
 	isExtensionEnabled,
 	readSection,
-	type Section,
 	stringValue,
 	updateSection,
 } from "../../lib/pi-tweaks-config";
 
-const EXTENSION = "pi-notify";
-const LEGACY_FILE = "pi-notify.json"; // read until pi-tweaks.json has a section
+const EXTENSION = "notify";
 
 interface Settings {
 	backend: string;
@@ -76,24 +69,8 @@ const OPTIONS: Record<keyof Settings, string[]> = {
 
 const KEYS = Object.keys(OPTIONS) as (keyof Settings)[];
 
-/** The previous home of these settings, read only until the section exists. */
-function legacySection(): Section | null {
-	try {
-		const parsed: unknown = JSON.parse(
-			readFileSync(join(getAgentDir(), LEGACY_FILE), "utf8"),
-		);
-		return typeof parsed === "object" &&
-			parsed !== null &&
-			!Array.isArray(parsed)
-			? (parsed as Section)
-			: null;
-	} catch {
-		return null;
-	}
-}
-
 function loadSettings(): Settings {
-	const section = readSection(EXTENSION) ?? legacySection();
+	const section = readSection(EXTENSION);
 	const settings = { ...DEFAULTS };
 	for (const key of KEYS) {
 		settings[key] = stringValue(section, key, OPTIONS[key], DEFAULTS[key]);
@@ -109,7 +86,7 @@ function saveSettings() {
 }
 
 const describe = () =>
-	`pi-notify: ${KEYS.map((key) => `${key}=${settings[key] || "(auto)"}`).join(", ")}`;
+	`notify: ${KEYS.map((key) => `${key}=${settings[key] || "(auto)"}`).join(", ")}`;
 
 function notifyLocal(body: string) {
 	if (settings.backend === "notify-send") {
@@ -179,8 +156,7 @@ export default function (pi: ExtensionAPI) {
 	);
 
 	pi.registerCommand("notify", {
-		description:
-			"Show or change pi-notify settings (persisted to pi-tweaks.json)",
+		description: "Show or change notify settings (persisted to pi-tweaks.json)",
 		handler: async (args, ctx) => {
 			const [name, value] = args.trim().split(/\s+/);
 			const key = name as keyof Settings;
