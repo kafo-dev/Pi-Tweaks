@@ -65,6 +65,42 @@ successful, small command keeps just its command, while
 `$ make test (2.4s, exit 1, ~140 tokens)` shows all three parts and
 `$ make test (2.4s, ~140 tokens)` drops the zero exit code.
 
+## `prune-sessions.ts`
+
+Hypothesis: an unnamed session that has seen no use for three months is dead
+weight, while a named session is worth keeping forever, and neither should be
+deleted when another pi still has it open.
+
+A session file is moved to the XDG trash when all three hold:
+
+- the file mtime is older than `olderThanDays` (default 90). The mtime is the
+  last append, so it is the last use, not the creation date.
+- the session carries no name from `/name` or `--name`.
+- no live pi process holds it, by the locks written by the sandbox wrapper
+  (`extras/pi-session-pick.mjs`, see [extras](../../extras/README.md)).
+
+```json
+{
+  "experiment-prune-sessions": {
+    "enabled": true,
+    "disableAutoPruning": false,
+    "olderThanDays": 90,
+    "pruneIntervalHours": 24
+  }
+}
+```
+
+With `disableAutoPruning` false, a round runs in the background five seconds
+after startup, at most once per `pruneIntervalHours`; it streams the session
+files, so a slow filesystem delays the round rather than the agent.
+`/pi-tweaks prune-sessions` runs a round on demand, and `--dry-run` reports
+without moving anything.
+
+The XDG trash lives at `$XDG_DATA_HOME/Trash` (default
+`~/.local/share/Trash`), which the sandbox does not bind read-write. A move
+from a sandboxed pi therefore needs `~/.local/share/Trash` in `rw-paths.txt`; a
+failed move is reported and nothing is lost.
+
 ## Conflicts
 
 `minimal-mode` sets a default bash timeout, which `pi-bash-timeout` also does.

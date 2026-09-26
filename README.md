@@ -17,8 +17,8 @@ extension listed in `pi.extensions`. The skills load on demand and are available
 as `/skill:browser-tools` and `/skill:web-tools`; the packaged extensions are
 loaded at startup. `notify` alerts on the terminal out of the box; its phone
 leg stays off until configured. The experimental extensions in
-`extensions/experiments/` are loaded too, but each registers nothing until its
-section is enabled in `pi-tweaks.json` (`experiment-minimal-mode`).
+`extensions/experiments/` are loaded too, but each registers nothing until its section is enabled in
+`pi-tweaks.json` (`experiment-minimal-mode`, `experiment-prune-sessions`).
 
 ## Configuration
 
@@ -98,6 +98,7 @@ that lives with the rest of the extension's settings.
 /pi-tweaks list              every packaged extension, and whether it is enabled
 /pi-tweaks notify …          the notify settings, and a test dialog
 /pi-tweaks pin-document      the documents pin-document resolves, and its errors
+/pi-tweaks prune-sessions …  a pruning round over the session store
 ```
 
 `list` is the command's own subcommand: it reads `pi.extensions` and the

@@ -6,6 +6,7 @@
  *   /pi-tweaks list              the packaged extensions, split by enabled state
  *   /pi-tweaks notify …          the notify extension's settings and test
  *   /pi-tweaks pin-document      the documents pin-document resolves
+ *   /pi-tweaks prune-sessions …  a pruning round over the session store
  *
  * A subcommand is named after the extension that answers it, and that
  * extension exports the work as a plain function; this file imports it.
@@ -30,6 +31,7 @@ import {
 	isPackagedExtensionEnabled,
 	packagedExtensions,
 } from "../lib/pi-tweaks-config";
+import { runPruneSessions } from "./experiments/prune-sessions";
 import { runNotify } from "./notify/index";
 import { reportPinnedDocuments } from "./pin-document";
 
@@ -37,6 +39,8 @@ const EXTENSION = "pi-tweaks";
 
 /** One `/pi-tweaks` subcommand, answered by an extension of the package. */
 type Subcommand = {
+	/** Section name in `pi-tweaks.json` of the extension that answers it. */
+	extension: string;
 	/** What the subcommand reports, one line for the usage text. */
 	description: string;
 	/** Run the subcommand with the text that followed its name. */
@@ -44,14 +48,15 @@ type Subcommand = {
 };
 
 /**
- * Every subcommand but `list`, in usage order. The key is the section name of
- * the extension that answers it, in `pi-tweaks.json`, so the enabled switch
- * and this table agree by construction.
+ * Every subcommand but `list`, in usage order. The extension name is the
+ * section name in `pi-tweaks.json`, so the enabled switch and this table agree
+ * by construction.
  */
 const SUBCOMMANDS: Array<[name: string, subcommand: Subcommand]> = [
 	[
 		"notify",
 		{
+			extension: "notify",
 			description: "notify settings: show one, change one, or test the path",
 			handler: runNotify,
 		},
@@ -59,8 +64,18 @@ const SUBCOMMANDS: Array<[name: string, subcommand: Subcommand]> = [
 	[
 		"pin-document",
 		{
+			extension: "pin-document",
 			description: "the documents pin-document resolves, and its errors",
 			handler: (_args, ctx) => reportPinnedDocuments(ctx),
+		},
+	],
+	[
+		"prune-sessions",
+		{
+			extension: "experiment-prune-sessions",
+			description:
+				"move old unnamed sessions to the trash (--dry-run to preview)",
+			handler: runPruneSessions,
 		},
 	],
 ];
@@ -131,10 +146,10 @@ export default function piTweaks(pi: ExtensionAPI) {
 				ctx.ui.notify(usage(), name === "" ? "info" : "warning");
 				return;
 			}
-			const [subcommandName, subcommand] = match;
-			if (extensionState(subcommandName) === false) {
+			const [, subcommand] = match;
+			if (extensionState(subcommand.extension) === false) {
 				ctx.ui.notify(
-					`${subcommandName} is disabled in ${configFilePath()}`,
+					`${subcommand.extension} is disabled in ${configFilePath()}`,
 					"warning",
 				);
 				return;
