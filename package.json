@@ -18,6 +18,7 @@
 			"./extensions/pi-bash-timeout.ts",
 			"./extensions/exit-alias.ts",
 			"./extensions/pin-document.ts",
+			"./extensions/snippet.ts",
 			"./extensions/experiments/minimal-mode.ts",
 			"./extensions/experiments/prune-sessions.ts"
 		],

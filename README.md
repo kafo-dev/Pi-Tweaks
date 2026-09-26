@@ -58,6 +58,7 @@ start (or `/reload`).
 | `notify` | `backend`, `phone`, `device`; `/pi-tweaks notify` writes them back here |
 | `pin-document` | `documents`: paths whose full text is pinned into the system prompt |
 | `exit-alias` | `enabled` only |
+| `snippet` | `enabled` only |
 | `pi-tweaks` | `enabled` only; the `/pi-tweaks` command itself |
 
 `pin-document` also reads a project file, `<cwd>/.pi/pin-document.json`, when
@@ -119,6 +120,7 @@ its own, `/pi-tweaks` prints the subcommands that are available.
 | [`extensions/notify/`](extensions/notify/) | Extension that alerts on a desktop and, optionally, a KDE Connect phone when pi settles a turn or blocks on a dialog. Terminal notifications on by default, phone off. See its [README](extensions/notify/README.md). |
 | [`extensions/pin-document.ts`](extensions/pin-document.ts) | Extension that appends the full text of the Markdown documents named in `pin-document.documents` to the system prompt on every turn, so they apply without the model deciding to read them. A `~` path resolves against the home directory, and any other relative path against the config file that names it. A document is appended as-is unless `showPathToAgent` or `stripFrontmatter` is true, which wraps it in a `<document>` element and, for `showPathToAgent`, writes a path into it — working-directory-relative, `~/…` under home, or absolute. The text is deterministic, which keeps it inside the provider's cached prefix. An invalid config or an unreadable document is reported as an error, and nothing is pinned for that turn. `/pi-tweaks pin-document` reports the resolved set, the byte size, and an estimated token count (four characters per token). |
 | [`extensions/exit-alias.ts`](extensions/exit-alias.ts) | Extension that adds `/exit` as an alias for pi's built-in `/quit`. |
+| [`extensions/snippet.ts`](extensions/snippet.ts) | Extension whose `/snippet` command opens a picker over the code in the conversation: one tab for fenced code blocks (listed with the language and the first and last lines), one for inline spans. The most recent block is first, and Enter copies the selected text to the system clipboard without the backticks or the language mark. Only the text of user and assistant messages on the active branch is read; tool results and tool-call arguments are skipped. |
 | [`extensions/pi-bash-timeout.ts`](extensions/pi-bash-timeout.ts) | Extension that fills in the built-in `bash` tool's `timeout` parameter (in seconds) when the model omits it, so a hung command cannot stall a turn. An explicit model value wins. The default is `pi-bash-timeout.timeoutSeconds` (10). |
 | [`skills/browser-tools/`](skills/browser-tools/) | CDP browser-automation skill. **Read [`skills/browser-tools/NOTICE.md`](skills/browser-tools/NOTICE.md)** for attribution and licensing before using or redistributing. |
 | [`skills/web-tools/`](skills/web-tools/) | Free, keyless web search through Exa's hosted MCP server, plus `web-read`, a local POSIX `sh` reader that turns a URL into LLM-friendly markdown. No API key. See its [README](skills/web-tools/README.md). |
