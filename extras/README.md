@@ -65,6 +65,10 @@ a lock for that session, or was started after the session file was last
 written; this is what `pi -c` cannot do, because `-c` always takes the most
 recent session even when another pi already has it open.
 
+Started from `$HOME` itself, the feature stays off: the home directory is not
+a project, so the only candidate there is whichever session under `$HOME` was
+used most recently.
+
 `extras/pi-session-pick.mjs` does the picking and writes one lock file per
 process under `<agentDir>/session-locks/`. Locks of processes that have exited
 are removed the next time the locks are read, so they do not accumulate. Node

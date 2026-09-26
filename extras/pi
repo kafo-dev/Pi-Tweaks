@@ -89,6 +89,13 @@ if [ -f "$wrapper_config" ]; then
 	done <"$wrapper_config"
 fi
 
+# Started from $HOME itself, auto-resume stays off. The home directory is not
+# a project, so the picker could only resume whichever session under $HOME was
+# used most recently, and a new session is the better answer.
+if [ "$cwd" = "$home_real" ]; then
+	auto_resume=0
+fi
+
 # A management subcommand starts no agent session.
 management=0
 case "${1-}" in
