@@ -66,14 +66,95 @@ pi_dir="${agent_dir%/*}"
 # "$HOME/.pi/scratchpad"), so it follows PI_CODING_AGENT_DIR like rw-paths.txt.
 scratch_dir="$pi_dir/scratchpad"
 
+cwd=$(pwd -P)
+home_real=$(cd "$HOME" && pwd -P)
+
+# Session auto-resume. Off unless a line of the wrapper config names it, so the
+# default stays the current behavior. The config sits beside the agent
+# directory (default "$HOME/.pi/wrapper-config.txt"), splits one entry per
+# line, and ignores blank lines and lines starting with '#'. A line containing
+# the word "auto-resume" turns the feature on for the run. See
+# extras/README.md.
+auto_resume=0
+wrapper_config="$pi_dir/wrapper-config.txt"
+if [ -f "$wrapper_config" ]; then
+	while IFS= read -r line || [ -n "$line" ]; do
+		line=$(printf '%s\n' "$line" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+		case "$line" in
+		"" | '#'*) continue ;;
+		esac
+		case "$line" in
+		*auto-resume*) auto_resume=1 ;;
+		esac
+	done <"$wrapper_config"
+fi
+
+# A management subcommand starts no agent session.
+management=0
+case "${1-}" in
+install | remove | uninstall | update | list | config | auth)
+	management=1
+	;;
+esac
+
+# An explicit session flag means the user chose the session; the only work left
+# is to lock it. --session also names the file. A custom session directory is
+# left alone, because the picker only knows the default layout.
+explicit_session=0
+named_session_file=
+previous=
+if [ -n "${PI_CODING_AGENT_SESSION_DIR:-}" ]; then
+	explicit_session=1
+fi
+for argument in "$@"; do
+	if [ "$previous" = "--session" ]; then
+		named_session_file=$argument
+		explicit_session=1
+	fi
+	case "$argument" in
+	-c | --continue | -r | --resume | --no-session | --fork | --fork=* | -n | --name | --name=*)
+		explicit_session=1
+		;;
+	--session | --session-dir | --session-dir=*)
+		explicit_session=1
+		;;
+	--session=*)
+		explicit_session=1
+		named_session_file=${argument#--session=}
+		;;
+	esac
+	previous=$argument
+done
+
+# The picker needs node; without it the run continues without a lock.
+picker=""
+if command -v node >/dev/null 2>&1; then
+	picker=$(dirname -- "$self")/pi-session-pick.mjs
+	[ -f "$picker" ] || picker=""
+fi
+
+picked=
+if [ "$management" = 0 ] && [ -n "$picker" ]; then
+	if [ "$auto_resume" = 1 ] && [ "$explicit_session" = 0 ]; then
+		picked=$(node "$picker" --agent-dir "$agent_dir" --cwd "$cwd" --pid "$$" --pick 2>/dev/null) || picked=
+	else
+		if [ -n "$named_session_file" ]; then
+			node "$picker" --agent-dir "$agent_dir" --cwd "$cwd" --pid "$$" --session-file "$named_session_file" >/dev/null 2>&1 || :
+		else
+			node "$picker" --agent-dir "$agent_dir" --cwd "$cwd" --pid "$$" >/dev/null 2>&1 || :
+		fi
+	fi
+fi
+
 if [ "${BWRAP:-1}" = "0" ]; then
 	echo "pi-wrapper: bwrap is not isolating the agent; pi runs with full permissions." >&2
 	sleep 1
-	exec "$real_pi" "$@"
+	if [ -n "$picked" ]; then
+		exec "$real_pi" --session "$picked" "$@"
+	else
+		exec "$real_pi" "$@"
+	fi
 fi
-
-cwd=$(pwd -P)
-home_real=$(cd "$HOME" && pwd -P)
 
 host=$(hostname | tr -c 'A-Za-z0-9.-' '-')
 
@@ -139,6 +220,12 @@ esac
 # binary in front, then prepend one bind per configured path. Prepending
 # reverses the configured order; every bind is read-write, so their relative
 # order does not matter.
+# A picked session joins pi's own arguments. The explicit flags are already in
+# "$@", so nothing is added for them.
+if [ -n "$picked" ]; then
+	set -- --session "$picked" "$@"
+fi
+
 if [ -n "$notice" ]; then
 	set -- "$real_pi" --append-system-prompt "$notice" "$@"
 else
