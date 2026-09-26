@@ -11,6 +11,6 @@
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true
 	},
-	"include": ["*.ts", "pi-notify/**/*.ts", "Experiment/**/*.ts"],
-	"exclude": ["node_modules", "browser-tools"]
+	"include": ["extensions/**/*.ts", "lib/**/*.ts"],
+	"exclude": ["node_modules", "skills/browser-tools"]
 }

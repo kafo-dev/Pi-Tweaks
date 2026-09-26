@@ -65,12 +65,12 @@ uses. The override can go once cheerio depends on v1 itself.
 
 ## Layout
 
-- `browser-tools/` is its own subproject. Keep its details (setup, usage,
+- `skills/browser-tools/` is its own subproject. Keep its details (setup, usage,
   patches, licensing) in its own Markdown files, not in the root README.
-- `web-tools/` is its own subproject. Keep its details (usage, free-tier
+- `skills/web-tools/` is its own subproject. Keep its details (usage, free-tier
   limits, licensing) in its own Markdown files, not in the root README.
-- `Extras/` is its own subproject. Keep wrapper behavior and limitations in
-  `Extras/README.md`.
-- `Experiment/` holds experimental extensions. They are listed in
+- `extras/` is its own subproject. Keep wrapper behavior and limitations in
+  `extras/README.md`.
+- `extensions/experiments/` holds experimental extensions. They are listed in
   `pi.extensions` but default off in `pi-tweaks.json`. Keep each experiment's
-  hypothesis and usage in `Experiment/README.md`.
+  hypothesis and usage in `extensions/experiments/README.md`.

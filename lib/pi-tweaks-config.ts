@@ -89,34 +89,39 @@ export type PackagedExtension = {
 	name: string;
 	/** Path as written in `pi.extensions`, from the package root. */
 	path: string;
-	/** Whether the file lives in `Experiment/`, where a section defaults off. */
+	/** Whether the file lives in `extensions/experiments/`, where a section defaults off. */
 	experiment: boolean;
 };
 
 /**
  * Section name and kind of an extension, from its `pi.extensions` path. The
  * name follows the file: the `.ts` suffix goes, `index` stands for its
- * directory, and an `Experiment/` file keeps that directory as a prefix, so
- * `Experiment/minimal-mode.ts` is `experiment-minimal-mode`.
+ * directory, and an experiment keeps that directory as a prefix, so
+ * `extensions/experiments/minimal-mode.ts` is `experiment-minimal-mode`.
  */
 function parseExtensionPath(path: string): PackagedExtension {
 	const bare = path.replace(/^\.\//, "").replace(/\.ts$/, "");
 	const parts = bare.split("/");
-	const experiment = parts.length > 1 && parts[0] === "Experiment";
-	const file = (experiment ? parts.slice(1) : parts).join("/");
+	// Extensions live under `extensions/`, experiments under a further
+	// `experiments/` there. The section name drops both directory levels:
+	// `extensions/pi-notify/index.ts` is `pi-notify`, and
+	// `extensions/experiments/minimal-mode.ts` is `experiment-minimal-mode`.
+	const afterRoot = parts[0] === "extensions" ? parts.slice(1) : parts;
+	const experiment = afterRoot.length > 1 && afterRoot[0] === "experiments";
+	const file = (experiment ? afterRoot.slice(1) : afterRoot).join("/");
 	const name = file.endsWith("/index") ? file.slice(0, -"/index".length) : file;
 	return { name: experiment ? `experiment-${name}` : name, path, experiment };
 }
 
 /**
- * Every extension in the package manifest, read from the `package.json` beside
- * this module. `null` when that file is missing or unreadable, or when
+ * Every extension in the package manifest, read from the `package.json` at
+ * the package root. `null` when that file is missing or unreadable, or when
  * `pi.extensions` is absent or holds a non-string entry.
  */
 export function packagedExtensions(): PackagedExtension[] | null {
 	try {
 		const manifest = JSON.parse(
-			readFileSync(join(import.meta.dirname, "package.json"), "utf8"),
+			readFileSync(join(import.meta.dirname, "..", "package.json"), "utf8"),
 		) as { pi?: { extensions?: unknown } };
 		const paths = manifest.pi?.extensions;
 		if (!Array.isArray(paths)) return null;

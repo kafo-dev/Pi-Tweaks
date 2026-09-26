@@ -159,6 +159,6 @@ includes it. Keep it that way: check for presence with
 
 ## License
 
-ISC — see the repository root [`LICENSE`](../LICENSE). Unlike
+ISC — see the repository root [`LICENSE`](../../LICENSE). Unlike
 [`browser-tools/`](../browser-tools/), this directory is not derived from
 upstream code and carries no separate license.

@@ -28,7 +28,7 @@ import {
 	isExtensionEnabled,
 	isPackagedExtensionEnabled,
 	packagedExtensions,
-} from "./pi-tweaks-config";
+} from "../lib/pi-tweaks-config";
 import { reportPinnedDocuments } from "./pin-document";
 
 const EXTENSION = "pi-tweaks";
@@ -67,7 +67,7 @@ function list(ctx: ExtensionCommandContext): void {
 	const extensions = packagedExtensions();
 	if (extensions === null) {
 		ctx.ui.notify(
-			"pi-tweaks: no usable list of extensions under `pi.extensions` in the package.json beside this file",
+			"pi-tweaks: no usable list of extensions under `pi.extensions` in the package.json at the package root",
 			"error",
 		);
 		return;

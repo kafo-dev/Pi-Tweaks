@@ -50,7 +50,7 @@ package globally:
 pi install git:github.com/kafo-dev/Pi-Tweaks   # or: pi install /path/to/Pi-Tweaks
 ```
 
-pi installs the dependencies and discovers `browser-tools/SKILL.md`. The skill
+pi installs the dependencies and discovers `skills/browser-tools/SKILL.md`. The skill
 then loads on demand and is available as `/skill:browser-tools`.
 
 ## Setup (manual checkout)

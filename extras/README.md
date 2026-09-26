@@ -19,7 +19,7 @@ the system-prompt note described under
 Link the script into your `PATH` so it shadows the `pi` command:
 
 ```sh
-ln -s "$PWD/Extras/pi" "$HOME/.local/bin/pi"
+ln -s "$PWD/extras/pi" "$HOME/.local/bin/pi"
 ```
 
 The wrapper finds the real `pi` on `PATH`, skipping itself so that

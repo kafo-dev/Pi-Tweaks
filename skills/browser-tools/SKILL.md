@@ -73,7 +73,7 @@ jq length "${TMPDIR:-/tmp}/links.json"
 
 Dependencies are installed automatically when this skill is installed as part of
 the Pi-Tweaks pi package. For a manual checkout, run `npm install` in the
-repository root (the parent directory of `{baseDir}`).
+repository root (two directories above `{baseDir}`).
 
 ## Start Chrome
 

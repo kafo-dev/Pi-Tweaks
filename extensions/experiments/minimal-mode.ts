@@ -81,7 +81,7 @@ import {
 	numberValue,
 	readSection,
 	type Section,
-} from "../pi-tweaks-config";
+} from "../../lib/pi-tweaks-config";
 
 const EXTENSION = "experiment-minimal-mode";
 const MEDIA_TOOL = "media"; // replaces the built-in `read`

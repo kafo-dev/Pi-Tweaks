@@ -20,7 +20,7 @@ import {
 	isExtensionEnabled,
 	numberValue,
 	readSection,
-} from "./pi-tweaks-config";
+} from "../lib/pi-tweaks-config";
 
 const EXTENSION = "pi-bash-timeout";
 const DEFAULT_BASH_TIMEOUT_SECONDS = 10; // when the model passes none

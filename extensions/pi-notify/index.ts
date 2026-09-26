@@ -54,7 +54,7 @@ import {
 	type Section,
 	stringValue,
 	updateSection,
-} from "../pi-tweaks-config";
+} from "../../lib/pi-tweaks-config";
 
 const EXTENSION = "pi-notify";
 const LEGACY_FILE = "pi-notify.json"; // read until pi-tweaks.json has a section

@@ -10,7 +10,7 @@ This directory contains code derived from **pi-skills** by Mario Zechner.
 
 Everything in `browser-tools/` is licensed under the **MIT License** — see
 [LICENSE](LICENSE). This directory-level license **overrides** the repository
-root ISC license ([`../LICENSE`](../LICENSE)) for **all files in this
+root ISC license ([`../../LICENSE`](../../LICENSE)) for **all files in this
 directory**, including those added by Pi-Tweaks. Do not apply the root ISC
 terms to anything under `browser-tools/`.
 
@@ -35,6 +35,6 @@ here are likewise MIT. Per-file origin:
 | `README.md`, `NOTICE.md`, `PATCHES.md` | added by Pi-Tweaks |
 
 Dependency declarations for this skill live in the repository root
-[`../package.json`](../package.json) (added by Pi-Tweaks); the upstream nested
+[`../../package.json`](../../package.json) (added by Pi-Tweaks); the upstream nested
 `package.json`/`package-lock.json` were removed when the repo became a pi
 package.

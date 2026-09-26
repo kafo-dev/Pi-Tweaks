@@ -55,7 +55,7 @@ import {
 	configFilePath,
 	isExtensionEnabled,
 	readSection,
-} from "./pi-tweaks-config";
+} from "../lib/pi-tweaks-config";
 
 const EXTENSION = "pin-document";
 const PROJECT_FILE = "pin-document.json";
