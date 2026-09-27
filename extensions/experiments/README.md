@@ -65,6 +65,47 @@ successful, small command keeps just its command, while
 `$ make test (2.4s, exit 1, ~140 tokens)` shows all three parts and
 `$ make test (2.4s, ~140 tokens)` drops the zero exit code.
 
+## `pop.ts`
+
+Hypothesis: the last thing a session did is often the thing to take back, and
+reaching for it should cost one command rather than a trip through the `/tree`
+picker.
+
+A session is an append-only tree, and what the model sees is the path from the
+root to the leaf, so moving the leaf is how an entry leaves the context. `/pop`
+points the leaf at the parent of the current entry: that one entry drops out of
+the branch, the transcript is re-rendered without it, and everything before it
+stays.
+
+pi's navigation treats a user message as a special case: navigating to one
+points the leaf at that message's own parent and hands the text to the caller,
+which puts it in the editor. `/pop` inherits that, so a pop that lands on a
+user message removes it as well and gives it back for editing — the result
+`/tree` produces when that message is picked.
+
+A turn that is still streaming is ended first: `/pop` aborts it, waits for the
+session to go idle, and reads the cursor only then, because the abort has moved
+the cursor onto the aborted turn's own last entry. So `/pop` during a response
+is how that response is taken back. In the TUI the abort also moves any queued
+message into the editor, where the busy-editor refusal below applies to it.
+
+```json
+{
+  "experiment-pop": { "enabled": true }
+}
+```
+
+The command refuses, rather than guess, when the cursor is already at the first
+entry, when a user message would come back with no room in the editor, when the
+entry above the cursor is a user message too, and in print and json modes, which
+carry no editor state. An RPC client receives the text of a message handed back
+as a `set_editor_text` request, and pi cannot read an RPC client's editor, so the
+check for a busy editor is the client's to make.
+
+Popping a tool result, then the assistant message that asked for it, leaves the
+branch ending on a tool call with no result, and pi sends the branch to the
+provider without repairing the pair.
+
 ## `prune-sessions.ts`
 
 Hypothesis: an unnamed session that has seen no use for three months is dead

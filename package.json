@@ -20,7 +20,8 @@
 			"./extensions/pin-document.ts",
 			"./extensions/snippet.ts",
 			"./extensions/experiments/minimal-mode.ts",
-			"./extensions/experiments/prune-sessions.ts"
+			"./extensions/experiments/prune-sessions.ts",
+			"./extensions/experiments/pop.ts"
 		],
 		"skills": [
 			"./skills/browser-tools",
