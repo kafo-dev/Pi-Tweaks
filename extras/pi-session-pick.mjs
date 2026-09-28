@@ -71,7 +71,7 @@ const lock = {
 	startedAtMs: Date.now(),
 	sessionFile: options.sessionFile ?? null,
 };
-writeLock(options.agentDir, lock);
+writeLock(lock);
 
 if (!options.pick) process.exit(0);
 
@@ -81,6 +81,6 @@ const picked = await pickSession({
 	excludePath: options.sessionFile,
 });
 if (picked) {
-	writeLock(options.agentDir, { ...lock, sessionFile: picked });
+	writeLock({ ...lock, sessionFile: picked });
 	process.stdout.write(`${picked}\n`);
 }

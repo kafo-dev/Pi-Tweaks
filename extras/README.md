@@ -70,10 +70,10 @@ a project, so the only candidate there is whichever session under `$HOME` was
 used most recently.
 
 `extras/pi-session-pick.mjs` does the picking and writes one lock file per
-process under `<agentDir>/session-locks/`. Locks of processes that have exited
-are removed the next time the locks are read, so they do not accumulate. Node
-must be on `PATH`; without it the wrapper starts no lock and picks no session,
-which is the default behavior.
+process under `<cacheDir>/pi-tweaks/session-locks/`. Locks of processes that
+have exited are removed the next time the locks are read, so they do not
+accumulate. Node must be on `PATH`; without it the wrapper starts no lock and
+picks no session, which is the default behavior.
 
 These arguments skip the pick, because they already name a session:
 `-c`/`--continue`, `-r`/`--resume`, `--session`, `--session-dir`,
@@ -129,7 +129,8 @@ concurrent agents out of each other's way.
 
 The note travels as `--append-system-prompt` text, so the note itself needs no
 file. The wrapper writes one small lock file per run under
-`<agentDir>/session-locks/`; see [Session auto-resume](#session-auto-resume).
+`<cacheDir>/pi-tweaks/session-locks/`; see
+[Session auto-resume](#session-auto-resume).
 A management subcommand starts no session and gets no note.
 
 ### Scratchpad
@@ -174,8 +175,8 @@ widen its own mounts.
 | Variable | Purpose |
 |----------|---------|
 | `BWRAP` | Set to `0` to skip the sandbox. The wrapper then warns and runs `pi` unsandboxed with the same arguments. |
-| `PI_CODING_AGENT_DIR` | Override the agent directory that is bound read-write. Default `~/.pi/agent`. The scratchpad, `rw-paths.txt`, and `wrapper-config.txt` move to its parent, and `session-locks/` moves with the agent directory. |
-| `XDG_CACHE_HOME` | Override the cache directory that is bound read-write. Default `~/.cache`. |
+| `PI_CODING_AGENT_DIR` | Override the agent directory that is bound read-write. Default `~/.pi/agent`. The scratchpad, `rw-paths.txt`, and `wrapper-config.txt` move to its parent. |
+| `XDG_CACHE_HOME` | Override the cache directory that is bound read-write. Default `~/.cache`. Pi-Tweaks keeps its runtime state in `<cacheDir>/pi-tweaks`: the session locks and the time of the last automatic prune round. |
 
 ### Notes and limitations
 

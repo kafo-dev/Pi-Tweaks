@@ -30,7 +30,8 @@
  * `disableAutoPruning` false (the default), a round runs in the background
  * five seconds after startup, at most once per `pruneIntervalHours`; it never
  * blocks startup. `/pi-tweaks prune-sessions [--dry-run]` runs a round on
- * demand.
+ * demand. The time of the last automatic round is kept in the Pi-Tweaks cache
+ * directory, `$XDG_CACHE_HOME/pi-tweaks` (see lib/pi-tweaks-cache.mjs).
  *
  * The XDG trash lives at `$XDG_DATA_HOME/Trash` (default
  * `~/.local/share/Trash`). It is outside the paths the sandbox binds
@@ -59,6 +60,7 @@ import type {
 	ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { cacheDir } from "../../lib/pi-tweaks-cache.mjs";
 import {
 	isExperimentEnabled,
 	numberValue,
@@ -99,29 +101,26 @@ type RoundResult = {
 	errors: string[];
 };
 
-/** The last time an automatic round ran, kept beside the agent directory. */
-function stateFile(agentDir: string): string {
-	return join(agentDir, "prune-sessions-state.json");
+/** The last time an automatic round ran, kept in the cache directory. */
+function stateFile(): string {
+	return join(cacheDir(), "prune-sessions-state.json");
 }
 
-function readLastRunMs(agentDir: string): number {
+function readLastRunMs(): number {
 	try {
-		const parsed = JSON.parse(readFileSync(stateFile(agentDir), "utf8"));
+		const parsed = JSON.parse(readFileSync(stateFile(), "utf8"));
 		return typeof parsed?.lastRunMs === "number" ? parsed.lastRunMs : 0;
 	} catch {
 		return 0;
 	}
 }
 
-function writeLastRunMs(agentDir: string, value: number) {
+function writeLastRunMs(value: number) {
 	try {
-		mkdirSync(agentDir, { recursive: true });
-		writeFileSync(
-			stateFile(agentDir),
-			`${JSON.stringify({ lastRunMs: value })}\n`,
-		);
+		mkdirSync(cacheDir(), { recursive: true });
+		writeFileSync(stateFile(), `${JSON.stringify({ lastRunMs: value })}\n`);
 	} catch {
-		// A read-only agent directory only means rounds run again next start.
+		// A read-only cache directory only means rounds run again next start.
 	}
 }
 
@@ -212,7 +211,7 @@ async function runRound(options: RoundOptions): Promise<RoundResult> {
 	const cutoff = Date.now() - olderThanDays * DAY_MS;
 	// Inside the sandbox the host pid of another pi cannot be checked, so
 	// every lock counts as live; the wrapper clears stale locks on the host.
-	const locks = readLiveLocks(agentDir, { assumeLive: true });
+	const locks = readLiveLocks({ assumeLive: true });
 	const result: RoundResult = {
 		scanned: 0,
 		candidates: 0,
@@ -327,11 +326,11 @@ export async function runPruneSessions(
 async function autoPrune(ctx: ExtensionContext) {
 	const agentDir = getAgentDir();
 	const settings = currentSettings();
-	const lastRunMs = readLastRunMs(agentDir);
+	const lastRunMs = readLastRunMs();
 	if (Date.now() - lastRunMs < settings.pruneIntervalHours * 60 * 60 * 1000) {
 		return;
 	}
-	writeLastRunMs(agentDir, Date.now());
+	writeLastRunMs(Date.now());
 	const result = await runRound({
 		agentDir,
 		olderThanDays: settings.olderThanDays,

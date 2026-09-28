@@ -178,7 +178,9 @@ With `disableAutoPruning` false, a round runs in the background five seconds
 after startup, at most once per `pruneIntervalHours`; it streams the session
 files, so a slow filesystem delays the round rather than the agent.
 `/pi-tweaks prune-sessions` runs a round on demand, and `--dry-run` reports
-without moving anything.
+without moving anything. The time of the last automatic round is kept beside
+the session locks, in the Pi-Tweaks cache directory: runtime state belongs in
+the cache, not in the agent directory that holds configuration.
 
 The XDG trash lives at `$XDG_DATA_HOME/Trash` (default
 `~/.local/share/Trash`), which the sandbox does not bind read-write. A move
