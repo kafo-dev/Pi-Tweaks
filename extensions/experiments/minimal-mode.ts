@@ -54,10 +54,10 @@
  * to be reached is the way to ask for the whole output. The command timeout
  * applies when the model passes none.
  *
- * stdout and stderr are joined, stdout first and stderr after it, and neither
- * carries a label: `pi.exec` buffers the two streams apart, so the order
- * between them is lost, and a line number addresses that joined text, not the
- * stream it came from. The whole output is also held in memory before it is
+ * stdout and stderr reach one pipe: the shell runs `exec 2>&1` before the
+ * command, so the two streams arrive interleaved in the order a terminal would
+ * show them, and a line number addresses that merged text. Nothing marks which
+ * stream a line came from, and the whole output is held in memory before it is
  * bounded, since `pi.exec` returns a string.
  *
  * `pi-bash-timeout` fills the same `timeout`, so enable only one: with both on,
@@ -543,11 +543,25 @@ function truncateOutput(
 	return parts.join("\n");
 }
 
+/**
+ * The merged output, trimmed. The command runs after `exec 2>&1`, so both
+ * streams reach one pipe; the join is a safety net for output that escapes the
+ * redirection, such as a parse error bash reports before running it.
+ */
 function combinedOutput(result: { stdout: string; stderr: string }): string {
 	return [result.stdout, result.stderr]
 		.filter((stream) => stream.trim())
 		.join("\n")
 		.trim();
+}
+
+/**
+ * The command as the shell runs it: stderr is pointed at stdout first, so the
+ * two streams reach one pipe and arrive in the order a terminal would show
+ * them. The newline keeps a trailing comment from swallowing the redirection.
+ */
+function mergedCommand(command: string): string {
+	return `exec 2>&1\n${command}`;
 }
 
 function resolveTimeoutSeconds(
@@ -582,7 +596,7 @@ function boundedBashTool(
 		name: "bash",
 		label: "bash",
 		description:
-			"Execute a bash command in the current working directory. Returns stdout and stderr.",
+			"Execute a bash command in the current working directory. Returns stdout and stderr merged in arrival order, as a terminal shows them.",
 		parameters: BASH_PARAMETERS,
 		promptSnippet: "Execute bash commands",
 		promptGuidelines: [
@@ -594,11 +608,15 @@ function boundedBashTool(
 				options.timeoutSeconds,
 			);
 			const startedAt = process.hrtime.bigint();
-			const result = await pi.exec("bash", ["-c", params.command], {
-				cwd: ctx.cwd,
-				signal,
-				timeout: timeout * 1000,
-			});
+			const result = await pi.exec(
+				"bash",
+				["-c", mergedCommand(params.command)],
+				{
+					cwd: ctx.cwd,
+					signal,
+					timeout: timeout * 1000,
+				},
+			);
 			const elapsedNs = Number(process.hrtime.bigint() - startedAt);
 			const output = truncateOutput(
 				combinedOutput(result),

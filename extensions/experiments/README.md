@@ -65,9 +65,10 @@ temp file holding the whole output, so an omitted part is one
 byte budget; a slice whose first line does not fit its share is cut.
 `timeoutSeconds` applies when the model passes no timeout of its own.
 
-stdout comes first and stderr after it, with no label: `pi.exec` buffers the two
-streams apart, so the order between them is lost and a line number addresses the
-joined text. The whole output is held in memory before it is bounded.
+stdout and stderr reach one pipe — the shell runs `exec 2>&1` before the command
+— so the text reads in arrival order, the way a terminal shows it. Nothing marks
+which stream a line came from, and the whole output is held in memory before it
+is bounded.
 
 Every option is required. With `"enabled": true` the section has to list all
 three, as in the example at the top of this file; a missing option, or a value
