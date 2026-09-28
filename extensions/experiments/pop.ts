@@ -1,6 +1,6 @@
 /**
  * pop — an experimental `/pop` command that steps the session tree back one
- * entry.
+ * entry, or back to the user's last message (`/pop user`).
  *
  * A session is an append-only tree, and the context the model sees is the path
  * from the root to the leaf. Moving the leaf is therefore how an entry leaves
@@ -14,6 +14,11 @@
  * user message removes it as well and gives it back for editing — the result
  * `/tree` produces when that message is picked.
  *
+ * `/pop user` aims the same move at the last message the user wrote on the
+ * branch: everything after it, usually the whole turn, leaves the context in a
+ * single navigation, and that message comes back for editing. Repeated `/pop`
+ * reaches the same place one render at a time.
+ *
  * A running turn is ended first rather than refused. The abort leaves the
  * cursor on the aborted turn's own last entry, so `/pop` during a response is
  * how that response is taken back. In the TUI the abort also moves any queued
@@ -24,6 +29,8 @@
  * - the cursor is already at the first entry: an extension cannot point the
  *   leaf above the first entry, because only `resetLeaf` does that and the
  *   extension API does not expose it;
+ * - `/pop user` finds no user message on the branch, or the cursor already sits
+ *   on the one it would target;
  * - the editor holds text and a user message is what comes back: pi fills the
  *   editor only when it is empty, so the text would leave the branch and never
  *   reach the user;
@@ -57,12 +64,17 @@ const EXTENSION = "experiment-pop";
 
 /** Refusal shown after the `pop: ` prefix, one constant per condition. */
 const FIRST_ENTRY = "the cursor is already at the first entry";
+const CURSOR_ON_USER = "the cursor is already on a user message";
+const NO_USER_MESSAGE = "the session holds no user message to aim at";
 const EDITOR_HOLDS_TEXT =
 	"the editor holds text, so the message would have nowhere to land; clear it first";
 const TWO_USER_MESSAGES =
 	"a user message sits above the cursor, and pi would drop both";
 const NO_EDITOR =
 	"print and json modes have no editor to hand a message back to";
+
+/** How far back an invocation of `/pop` aims. */
+type PopMode = "one" | "user";
 
 /** What `/pop` should do, decided before anything is touched. */
 type PopDecision =
@@ -152,12 +164,50 @@ function decidePop(
 	return { kind: "navigate", targetId: parent.id };
 }
 
-/** Move the cursor one entry back, reporting why when it cannot move. */
-async function pop(ctx: ExtensionCommandContext): Promise<void> {
+/**
+ * The move for `/pop user`: aim at the last message the user wrote on the
+ * branch, which is the newest one the session still carries. pi puts the cursor
+ * above that message and returns its text, so one navigation takes everything
+ * after it out of the context — usually the whole current turn — and hands the
+ * message back. The branch is the root-to-leaf path, so the scan runs from the
+ * leaf towards the root.
+ */
+function decideUser(
+	branch: readonly SessionEntry[],
+	leaf: SessionEntry,
+	editorEmpty: boolean,
+): PopDecision {
+	let target: SessionEntry | undefined;
+	for (let index = branch.length - 1; index >= 0; index -= 1) {
+		if (userText(branch[index]) !== undefined) {
+			target = branch[index];
+			break;
+		}
+	}
+	if (target === undefined) return { kind: "refuse", reason: NO_USER_MESSAGE };
+	if (target.id === leaf.id) return { kind: "refuse", reason: CURSOR_ON_USER };
+	return hand(target.id, userText(target) ?? "", editorEmpty);
+}
+
+/**
+ * The move an invocation asked for, without side effects: no argument steps one
+ * entry back, `user` aims at the first user message, and anything else is a
+ * typo the caller reports.
+ */
+function parseMode(args: string): PopMode | undefined {
+	const trimmed = args.trim();
+	if (trimmed === "") return "one";
+	if (trimmed === "user") return "user";
+	return undefined;
+}
+
+/** Move the cursor back, reporting why when it cannot move. */
+async function pop(ctx: ExtensionCommandContext, mode: PopMode): Promise<void> {
 	if (ctx.mode !== "tui" && ctx.mode !== "rpc") {
 		ctx.ui.notify(`pop: ${NO_EDITOR}`, "warning");
 		return;
 	}
+
 	// A running turn is ended first: navigation needs an idle session, and the
 	// entries the turn has already written are what the pop is about. The abort
 	// moves the cursor onto the aborted turn's own last entry, so the cursor is
@@ -173,13 +223,16 @@ async function pop(ctx: ExtensionCommandContext): Promise<void> {
 		ctx.ui.notify("pop: the cursor is at the start of the session", "warning");
 		return;
 	}
-	const parent =
-		leaf.parentId === null ? undefined : manager.getEntry(leaf.parentId);
-	const decision = decidePop(
-		leaf,
-		parent,
-		ctx.ui.getEditorText().trim() === "",
-	);
+
+	const editorEmpty = ctx.ui.getEditorText().trim() === "";
+	let decision: PopDecision;
+	if (mode === "user") {
+		decision = decideUser(manager.getBranch(), leaf, editorEmpty);
+	} else {
+		const parent =
+			leaf.parentId === null ? undefined : manager.getEntry(leaf.parentId);
+		decision = decidePop(leaf, parent, editorEmpty);
+	}
 	if (decision.kind === "refuse") {
 		ctx.ui.notify(`pop: ${decision.reason}`, "warning");
 		return;
@@ -205,8 +258,16 @@ export default function (pi: ExtensionAPI) {
 
 	pi.registerCommand("pop", {
 		description: "Go back one entry in the session tree",
-		handler: async (_args, ctx) => {
-			await pop(ctx);
+		handler: async (args, ctx) => {
+			const mode = parseMode(args);
+			if (mode === undefined) {
+				ctx.ui.notify(
+					`pop: unknown argument ${JSON.stringify(args.trim())}; use /pop or /pop user`,
+					"warning",
+				);
+				return;
+			}
+			await pop(ctx, mode);
 		},
 	});
 }

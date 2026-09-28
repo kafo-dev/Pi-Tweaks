@@ -83,6 +83,11 @@ which puts it in the editor. `/pop` inherits that, so a pop that lands on a
 user message removes it as well and gives it back for editing — the result
 `/tree` produces when that message is picked.
 
+`/pop user` aims the same move at the last message the user wrote on the branch.
+One navigation takes everything after it out of the context — usually the whole
+turn — and that message comes back to the editor; repeated `/pop` reaches the
+same place one render at a time.
+
 A turn that is still streaming is ended first: `/pop` aborts it, waits for the
 session to go idle, and reads the cursor only then, because the abort has moved
 the cursor onto the aborted turn's own last entry. So `/pop` during a response
@@ -96,11 +101,13 @@ message into the editor, where the busy-editor refusal below applies to it.
 ```
 
 The command refuses, rather than guess, when the cursor is already at the first
-entry, when a user message would come back with no room in the editor, when the
-entry above the cursor is a user message too, and in print and json modes, which
-carry no editor state. An RPC client receives the text of a message handed back
-as a `set_editor_text` request, and pi cannot read an RPC client's editor, so the
-check for a busy editor is the client's to make.
+entry, when `/pop user` finds no user message on the branch or the cursor
+already sits on the one it would target, when a user message would come
+back with no room in the editor, when the entry above the cursor is a user
+message too, and in print and json modes, which carry no editor state. An RPC
+client receives the text of a message handed back as a `set_editor_text`
+request, and pi cannot read an RPC client's editor, so the check for a busy
+editor is the client's to make.
 
 Popping a tool result, then the assistant message that asked for it, leaves the
 branch ending on a tool call with no result, and pi sends the branch to the
