@@ -44,11 +44,30 @@ removed from the active set. `media` delegates to the built-in `read` tool and
 ones, so text and images keep working while the prompt does not advertise
 behavior the mode drops.
 
-`bash` bounds its output: past `maxLines` lines total (split evenly between the
-two ends) or `maxBytes` bytes, the middle is dropped and the full output is
-written to a temp file named in the marker. Output with few lines but too many
-bytes is cut at the byte budget instead. `timeoutSeconds` applies when the
-model passes no timeout of its own.
+`bash` bounds its output: past `maxLines` lines total or `maxBytes` bytes, the
+result keeps the head, a run from the middle, and the tail:
+
+```
+  1 first line
+  2 second line
+...
+  9 ninth line
+ 10 tenth line
+...
+ 20 last line
+[the output was truncated, each line was prefixed with its absolute number, file: /tmp/pi-bash-<hex>.log]
+```
+
+Every kept line is prefixed with its number in the original output, a line
+reading `...` stands in for each run of dropped lines, and the footer names the
+temp file holding the whole output, so an omitted part is one
+`sed -n 'N,Mp' <file>` away. The line budget splits in three, and so does the
+byte budget; a slice whose first line does not fit its share is cut.
+`timeoutSeconds` applies when the model passes no timeout of its own.
+
+stdout comes first and stderr after it, with no label: `pi.exec` buffers the two
+streams apart, so the order between them is lost and a line number addresses the
+joined text. The whole output is held in memory before it is bounded.
 
 Every option is required. With `"enabled": true` the section has to list all
 three, as in the example at the top of this file; a missing option, or a value

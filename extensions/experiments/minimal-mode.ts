@@ -31,13 +31,34 @@
  *     estimate is four characters per token.
  *
  * `bash` runs through `pi.exec`, so its output is bounded: past `maxLines`
- * lines total (split evenly between the two ends) or `maxBytes` bytes, the
- * middle is dropped and the full output is written to a temp file named in the
- * marker. Output with few lines but too many bytes is cut at the byte budget
- * instead. Both budgets are fixed by the config, so the model cannot raise them
- * for a call, and there is no value that turns truncation off: a budget wide
- * enough never to be reached is the way to ask for the whole output. The
- * command timeout applies when the model passes none.
+ * lines total or `maxBytes` bytes, the result keeps the head, a run from the
+ * middle, and the tail, in this shape:
+ *
+ *    1 first line
+ *    2 second line
+ *    ...
+ *    9 ninth line
+ *   10 tenth line
+ *    ...
+ *   20 last line
+ *   [the output was truncated, each line was prefixed with its absolute number,
+ *   file: /tmp/pi-bash-<hex>.log]
+ *
+ * Every kept line is prefixed with its number in the original output, a line
+ * reading `...` stands in for each run of dropped lines, and the footer names
+ * the temp file holding the whole output, so an omitted part is one
+ * `sed -n 'N,Mp' <file>` away. The line budget splits in three, and so does the
+ * byte budget; a slice whose first line does not fit its share is cut. Both
+ * budgets are fixed by the config, so the model cannot raise them for a call,
+ * and there is no value that turns truncation off: a budget wide enough never
+ * to be reached is the way to ask for the whole output. The command timeout
+ * applies when the model passes none.
+ *
+ * stdout and stderr are joined, stdout first and stderr after it, and neither
+ * carries a label: `pi.exec` buffers the two streams apart, so the order
+ * between them is lost, and a line number addresses that joined text, not the
+ * stream it came from. The whole output is also held in memory before it is
+ * bounded, since `pi.exec` returns a string.
  *
  * `pi-bash-timeout` fills the same `timeout`, so enable only one: with both on,
  * the value depends on extension load order. An extension cannot disable
@@ -46,11 +67,11 @@
  *
  * Config, all under `experiment-minimal-mode` in `pi-tweaks.json`. With
  * `"enabled": true` the section has to list every option: `timeoutSeconds`
- * (seconds, at most 2147483.647), `maxLines` (lines in total, split between the
- * two ends), and `maxBytes` (bytes in total). The mode changes what the model
- * can do, so a fallback is a value the user never chose: a missing option, or
- * one that breaks its rule, registers nothing and reports one error per problem
- * at session start.
+ * (seconds, at most 2147483.647), `maxLines` (lines in total, split across the
+ * three slices), and `maxBytes` (bytes in total). The mode changes what the
+ * model can do, so a fallback is a value the user never chose: a missing
+ * option, or one that breaks its rule, registers nothing and reports one error
+ * per problem at session start.
  *
  * The extension is listed in the package manifest, so pi loads it, but it
  * registers nothing until enabled by hand:
@@ -77,8 +98,6 @@ import {
 	createReadTool,
 	type ExtensionAPI,
 	type ToolDefinition,
-	truncateHead,
-	truncateTail,
 } from "@earendil-works/pi-coding-agent";
 import {
 	MouseRegion,
@@ -368,10 +387,104 @@ function resultText(result: { content: readonly unknown[] }): string {
 	return part?.text ?? "";
 }
 
+/** One run of kept lines: where it starts in the original output, and its text. */
+type KeptRun = {
+	/** 1-based number of the first kept line. */
+	start: number;
+	/** The kept lines, each prefixed with its own number. */
+	lines: string[];
+};
+
+/** Slices a truncated result shows: a head, a run from the middle, and a tail. */
+const SLICES = 3;
+
+/** Bytes the ellipsis costs, so a cut line can be held to its budget. */
+const ELLIPSIS_BYTES = Buffer.byteLength(ELLIPSIS);
+
+/** The prefix that makes a line addressable: its number, right-aligned, and a tab. */
+function numbered(number: number, width: number, line: string): string {
+	return `${String(number).padStart(width)}\t${line}`;
+}
+
+/** The first `budget` bytes of `text`, dropping a character the cut splits. */
+function headBytes(text: string, budget: number): string {
+	const bytes = Buffer.from(text, "utf8").subarray(0, Math.max(0, budget));
+	return new TextDecoder("utf-8").decode(bytes, { stream: true });
+}
+
 /**
- * Keep the head and the tail of `output` once it exceeds `maxLines` lines or
- * `maxBytes` bytes, writing the full text to a temp file named in the marker.
- * The line budget is split evenly between the two ends.
+ * The last `budget` bytes of `text`. A character the cut splits becomes a
+ * replacement character, which is the price of not scanning the whole line.
+ */
+function tailBytes(text: string, budget: number): string {
+	const bytes = Buffer.from(text, "utf8");
+	return new TextDecoder("utf-8").decode(
+		bytes.subarray(Math.max(0, bytes.length - budget)),
+	);
+}
+
+/**
+ * Take lines from one end of the offered range while they fit `budget` bytes,
+ * numbering each one. A range whose first line does not fit keeps that line cut
+ * to the budget, so a slice always shows something; the caller drops a run with
+ * no lines. The kept lines are contiguous, so the caller can turn the numbers
+ * around them into the omitted ranges.
+ */
+function takeLines(
+	lines: readonly string[],
+	first: number,
+	count: number,
+	budget: number,
+	width: number,
+	fromEnd: boolean,
+): KeptRun | undefined {
+	const kept: string[] = [];
+	let bytes = 0;
+	for (let offset = 0; offset < count; offset += 1) {
+		const number = fromEnd ? first + count - 1 - offset : first + offset;
+		const text = lines[number - 1];
+		const cost = Buffer.byteLength(numbered(number, width, text));
+		if (bytes + cost <= budget) {
+			kept.push(numbered(number, width, text));
+			bytes += cost;
+			continue;
+		}
+		if (kept.length === 0) {
+			const room = Math.max(0, budget - width - ELLIPSIS_BYTES - 1);
+			const cut = fromEnd
+				? `${ELLIPSIS}${tailBytes(text, room)}`
+				: `${headBytes(text, room)}${ELLIPSIS}`;
+			kept.push(numbered(number, width, cut));
+		}
+		break;
+	}
+	if (fromEnd) kept.reverse();
+	if (kept.length === 0) return undefined;
+	// Taking from the end leaves a run that no longer starts where the range did.
+	const start = fromEnd ? first + count - kept.length : first;
+	return { start, lines: kept };
+}
+
+/** The line that stands in for a run of dropped lines. */
+const OMITTED_LINE = "...";
+
+/**
+ * The line that closes a truncated result. It names the file holding the whole
+ * output and the numbering the kept lines carry, which is all a `sed -n 'N,Mp'`
+ * against that file needs.
+ */
+function truncationFooter(file: string): string {
+	return `[the output was truncated, each line was prefixed with its absolute number, file: ${file}]`;
+}
+
+/**
+ * Keep the head, a run from the middle, and the tail of `output` once it
+ * exceeds `maxLines` lines or `maxBytes` bytes. Every kept line carries its
+ * number in the original output, a line reading `...` stands in for each run of
+ * dropped lines, and a footer names the temp file holding the whole output, so
+ * an omitted part is one `sed -n 'N,Mp' <file>` away. The line budget splits in
+ * three, and so does the byte budget, which is what keeps all three slices in
+ * the result.
  */
 function truncateOutput(
 	output: string,
@@ -389,28 +502,45 @@ function truncateOutput(
 	);
 	writeFileSync(file, output);
 
-	// Few lines but too many bytes: cut at the byte budget. truncateHead is
-	// line-oriented and returns nothing when the first line alone exceeds it, so
-	// slice the encoded bytes; stream mode drops a character split by the cut.
-	if (lines.length <= maxLines) {
-		const bytes = Buffer.from(output, "utf8");
-		const kept = new TextDecoder("utf-8").decode(bytes.subarray(0, maxBytes), {
-			stream: true,
-		});
-		const omitted = bytes.length - Buffer.byteLength(kept, "utf8");
-		return `${kept}\n[... ${omitted} bytes truncated; full output: ${file} ...]`;
-	}
+	const total = lines.length;
+	const width = String(total).length;
+	// Few lines but too many bytes: the byte budget is what binds, and the line
+	// budget only caps it. The head takes the remainder, and the tail never
+	// takes lines the head has already spent, so one or two lines still split.
+	const shown = Math.min(maxLines, total);
+	const share = Math.ceil(shown / SLICES);
+	const headCount = Math.min(share, shown);
+	const tailCount = Math.min(share, Math.max(0, shown - headCount));
+	const centerCount = Math.max(0, shown - headCount - tailCount);
 
-	const head = truncateHead(output, {
-		maxLines: Math.max(1, Math.floor(maxLines / 2)),
-		maxBytes: Math.max(1, Math.floor(maxBytes / 2)),
-	});
-	const tail = truncateTail(output, {
-		maxLines: Math.max(1, Math.floor(maxLines / 2)),
-		maxBytes: Math.max(1, Math.floor(maxBytes / 2)),
-	});
-	const omitted = lines.length - head.outputLines - tail.outputLines;
-	return `${head.content}\n[... ${omitted} lines truncated; full output: ${file} ...]\n${tail.content}`;
+	// The middle slice sits at the centre of what the head and the tail leave.
+	const freeFirst = headCount + 1;
+	const freeCount = Math.max(0, total - headCount - tailCount);
+	const centerFirst =
+		freeFirst + Math.floor(Math.max(0, freeCount - centerCount) / 2);
+	const centerLines = Math.min(centerCount, freeCount);
+
+	const byteShare = Math.floor(maxBytes / SLICES);
+	const budget = [maxBytes - byteShare * (SLICES - 1), byteShare, byteShare];
+
+	const runs = [
+		takeLines(lines, 1, headCount, budget[0], width, false),
+		takeLines(lines, centerFirst, centerLines, budget[1], width, false),
+		takeLines(lines, total - tailCount + 1, tailCount, budget[2], width, true),
+	].filter((run): run is KeptRun => run !== undefined);
+
+	// The numbers around a gap say what the gap holds, so it needs no range of
+	// its own; the footer names the file and closes the result.
+	const parts: string[] = [];
+	let next = 1;
+	for (const run of runs) {
+		if (run.start > next) parts.push(OMITTED_LINE);
+		parts.push(...run.lines);
+		next = run.start + run.lines.length;
+	}
+	if (next <= total) parts.push(OMITTED_LINE);
+	parts.push(truncationFooter(file));
+	return parts.join("\n");
 }
 
 function combinedOutput(result: { stdout: string; stderr: string }): string {
