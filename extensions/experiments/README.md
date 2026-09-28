@@ -10,7 +10,10 @@ registers nothing until enabled by hand in `pi-tweaks.json`:
     "enabled": true,
     "timeoutSeconds": 32,
     "maxLines": 1024,
-    "maxBytes": 32768
+    "maxBytes": 32768,
+    "minSeconds": 2,
+    "minTokens": 128,
+    "showExitCode": true
   }
 }
 ```
@@ -71,12 +74,14 @@ which stream a line came from, and the whole output is held in memory before it
 is bounded.
 
 Every option is required. With `"enabled": true` the section has to list all
-three, as in the example at the top of this file; a missing option, or a value
+six, as in the example at the top of this file; a missing option, or a value
 that breaks its rule, registers nothing and reports one error per problem when
 the session starts, and `/pi-tweaks list` shows the experiment as switched on
 but unusable, with the same messages. `timeoutSeconds` is a positive number of
 seconds, at most 2147483.647, the ceiling of a 32-bit timer; `maxLines` and
-`maxBytes` are positive integers. The mode changes which tools the model has,
+`maxBytes` are positive integers; `minSeconds` is a non-negative number of
+seconds and `minTokens` a non-negative integer, so zero shows that part every
+time; `showExitCode` is a boolean. The mode changes which tools the model has,
 so a fallback value is never used in place of one the section did not set.
 
 The `bash` row is collapsed. The collapsed row holds `$ ` and the command,
@@ -88,11 +93,13 @@ still streaming, before the call has a result.
 
 The command line ends with the command's wall-clock time rounded to the
 nearest second in Go's `time.Duration` format, its exit code, and an output
-estimate at four characters per token. A part is dropped when it is not worth showing: the time
-below two seconds, `exit 0`, and an estimate below 128 tokens. So a fast,
-successful, small command keeps just its command, while
-`$ make test (2.4s, exit 1, ~140 tokens)` shows all three parts and
-`$ make test (2.4s, ~140 tokens)` drops the zero exit code.
+estimate at four characters per token. The row drops the parts the config says
+are not worth showing: the time below `minSeconds` seconds, `exit 0`, and an
+estimate below `minTokens` tokens, while `showExitCode` false drops the exit
+code even when it is not zero. So a fast, successful, small command keeps just
+its command, while `$ make test (2.4s, exit 1, ~140 tokens)` shows all three
+parts, and the same command with `minTokens` 200 shows
+`$ make test (2.4s, exit 1)`.
 
 ## `pop.ts`
 
@@ -191,7 +198,10 @@ disable another, so disable the packaged extension in the same file:
     "enabled": true,
     "timeoutSeconds": 32,
     "maxLines": 1024,
-    "maxBytes": 32768
+    "maxBytes": 32768,
+    "minSeconds": 2,
+    "minTokens": 128,
+    "showExitCode": true
   },
   "pi-bash-timeout": { "enabled": false }
 }

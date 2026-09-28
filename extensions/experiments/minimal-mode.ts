@@ -24,11 +24,12 @@
  *   - The collapsed row shows no output, successful or failed; a non-zero exit
  *     appears only in the suffix.
  *   - The command line ends with `(<time>, exit <code>, ~<tokens> tokens)`,
- *     dropping any part not worth showing: the time below two seconds,
- *     `exit 0`, and a token estimate below 128. With nothing left to show, the
- *     row keeps just the command. The time is the command's wall-clock time
- *     rounded to the nearest second, in Go's `time.Duration` format, and the
- *     estimate is four characters per token.
+ *     dropping any part the config says is not worth showing: the time below
+ *     `minSeconds`, `exit 0`, and a token estimate below `minTokens`, while
+ *     `showExitCode` drops the exit code itself. With nothing left to show,
+ *     the row keeps just the command. The time is the command's wall-clock
+ *     time rounded to the nearest second, in Go's `time.Duration` format, and
+ *     the estimate is four characters per token.
  *
  * `bash` runs through `pi.exec`, so its output is bounded: past `maxLines`
  * lines total or `maxBytes` bytes, the result keeps the head, a run from the
@@ -68,10 +69,12 @@
  * Config, all under `experiment-minimal-mode` in `pi-tweaks.json`. With
  * `"enabled": true` the section has to list every option: `timeoutSeconds`
  * (seconds, at most 2147483.647), `maxLines` (lines in total, split across the
- * three slices), and `maxBytes` (bytes in total). The mode changes what the
- * model can do, so a fallback is a value the user never chose: a missing
- * option, or one that breaks its rule, registers nothing and reports one error
- * per problem at session start.
+ * three slices), `maxBytes` (bytes in total), `minSeconds` (seconds, from
+ * which the row shows the time), `minTokens` (tokens, from which it shows the
+ * estimate), and `showExitCode` (whether it shows a non-zero exit code). The
+ * mode changes what the model can do, so a fallback is a value the user never
+ * chose: a missing option, or one that breaks its rule, registers nothing and
+ * reports one error per problem at session start.
  *
  * The extension is listed in the package manifest, so pi loads it, but it
  * registers nothing until enabled by hand:
@@ -81,7 +84,10 @@
  *       "enabled": true,
  *       "timeoutSeconds": 32,
  *       "maxLines": 1024,
- *       "maxBytes": 32768
+ *       "maxBytes": 32768,
+ *       "minSeconds": 2,
+ *       "minTokens": 128,
+ *       "showExitCode": true
  *     }
  *   }
  *
@@ -130,8 +136,9 @@ const MICROSECOND = 1000 * NANOSECOND;
 const MILLISECOND = 1000 * MICROSECOND;
 const SECOND = 1000 * MILLISECOND;
 const CHARS_PER_TOKEN = 4; // rough token estimate for the row suffix
-const MIN_SHOWN_SECONDS = 2; // omit the time below this
-const MIN_SHOWN_TOKENS = 128; // omit the token estimate below this
+const DEFAULT_MIN_SECONDS = 2; // show the time from this many seconds on
+const DEFAULT_MIN_TOKENS = 128; // show the estimate from this many tokens on
+const DEFAULT_SHOW_EXIT_CODE = true; // show a non-zero exit code
 const META_CAP = 200; // tool rows whose suffix data is kept
 
 /** Resolved settings for the mode. */
@@ -139,23 +146,41 @@ interface MinimalModeOptions {
 	timeoutSeconds: number;
 	maxLines: number;
 	maxBytes: number;
+	minSeconds: number;
+	minTokens: number;
+	showExitCode: boolean;
 }
 
+/** The number-valued keys of the section. */
+type NumberKey = {
+	[K in keyof MinimalModeOptions]: MinimalModeOptions[K] extends number
+		? K
+		: never;
+}[keyof MinimalModeOptions];
+
+/** The boolean-valued keys of the section. */
+type FlagKey = {
+	[K in keyof MinimalModeOptions]: MinimalModeOptions[K] extends boolean
+		? K
+		: never;
+}[keyof MinimalModeOptions];
+
 /** One option the section has to set. */
-type RequiredOption = {
+type OptionRule<K extends keyof MinimalModeOptions> = {
 	/** Key in the section, and the name an error message uses. */
-	key: keyof MinimalModeOptions;
+	key: K;
 	/** The rule, as an error message states it. */
 	rule: string;
-	/** Whether a present value satisfies the rule; narrows it to a number. */
-	accepts: (value: unknown) => value is number;
+	/** Whether a present value satisfies the rule; narrows it to its type. */
+	accepts: (value: unknown) => value is MinimalModeOptions[K];
 };
 
 /**
- * Every option of the section, in error-message order. The guard holds the
- * rule, so an error message and the check that produced it cannot drift apart.
+ * Every number-valued option of the section, in error-message order. The guard
+ * holds the rule, so an error message and the check that produced it cannot
+ * drift apart.
  */
-const REQUIRED_OPTIONS: readonly RequiredOption[] = [
+const REQUIRED_NUMBERS: readonly OptionRule<NumberKey>[] = [
 	{
 		key: "timeoutSeconds",
 		rule: `a positive number of seconds, at most ${MAX_TIMEOUT_SECONDS}`,
@@ -177,6 +202,27 @@ const REQUIRED_OPTIONS: readonly RequiredOption[] = [
 		accepts: (value): value is number =>
 			typeof value === "number" && Number.isInteger(value) && value > 0,
 	},
+	{
+		key: "minSeconds",
+		rule: "a non-negative number of seconds",
+		accepts: (value): value is number =>
+			typeof value === "number" && Number.isFinite(value) && value >= 0,
+	},
+	{
+		key: "minTokens",
+		rule: "a non-negative integer",
+		accepts: (value): value is number =>
+			typeof value === "number" && Number.isInteger(value) && value >= 0,
+	},
+];
+
+/** Every boolean-valued option of the section, read after the numbers. */
+const REQUIRED_FLAGS: readonly OptionRule<FlagKey>[] = [
+	{
+		key: "showExitCode",
+		rule: "a boolean",
+		accepts: (value): value is boolean => typeof value === "boolean",
+	},
 ];
 
 /**
@@ -196,6 +242,30 @@ type MinimalModeConfig =
 	| { kind: "options"; options: MinimalModeOptions }
 	| { kind: "errors"; messages: string[] };
 
+/** One message for an option the section does not set to an accepted value. */
+function optionError(key: string, rule: string, value: unknown): string {
+	return value === undefined
+		? `${EXTENSION}: "${key}" is missing; with "enabled": true the section must set it to ${rule}`
+		: `${EXTENSION}: "${key}" is ${JSON.stringify(value)}, but it must be ${rule}`;
+}
+
+/** Read one table of options into `options`, one message per problem. */
+function readOptions<K extends keyof MinimalModeOptions>(
+	list: readonly OptionRule<K>[],
+	section: Section | null,
+	options: MinimalModeOptions,
+	messages: string[],
+): void {
+	for (const option of list) {
+		const value = section?.[option.key];
+		if (value !== undefined && option.accepts(value)) {
+			options[option.key] = value;
+		} else {
+			messages.push(optionError(option.key, option.rule, value));
+		}
+	}
+}
+
 /**
  * Read the section strictly: with `"enabled": true` every option has to be
  * listed and satisfy its rule. A section that omits one, or carries a value
@@ -207,22 +277,13 @@ function readConfig(section: Section | null): MinimalModeConfig {
 		timeoutSeconds: DEFAULT_BASH_TIMEOUT_SECONDS,
 		maxLines: DEFAULT_MAX_LINES,
 		maxBytes: DEFAULT_MAX_BYTES,
+		minSeconds: DEFAULT_MIN_SECONDS,
+		minTokens: DEFAULT_MIN_TOKENS,
+		showExitCode: DEFAULT_SHOW_EXIT_CODE,
 	};
 	const messages: string[] = [];
-	for (const option of REQUIRED_OPTIONS) {
-		const value = section?.[option.key];
-		if (value === undefined) {
-			messages.push(
-				`${EXTENSION}: "${option.key}" is missing; with "enabled": true the section must set it to ${option.rule}`,
-			);
-		} else if (option.accepts(value)) {
-			options[option.key] = value;
-		} else {
-			messages.push(
-				`${EXTENSION}: "${option.key}" is ${JSON.stringify(value)}, but it must be ${option.rule}`,
-			);
-		}
-	}
+	readOptions(REQUIRED_NUMBERS, section, options, messages);
+	readOptions(REQUIRED_FLAGS, section, options, messages);
 	// The starting values only give `options` its type; a section that reached
 	// them with a value missing never gets here.
 	return messages.length > 0
@@ -742,11 +803,13 @@ export default function (pi: ExtensionAPI) {
 			const info = bashMeta.get(context.toolCallId);
 			const parts: string[] = [];
 			if (info) {
-				if (info.elapsedNs >= MIN_SHOWN_SECONDS * SECOND) {
+				if (info.elapsedNs >= options.minSeconds * SECOND) {
 					parts.push(goDuration(roundToSecond(info.elapsedNs)));
 				}
-				if (info.code !== 0) parts.push(`exit ${info.code}`);
-				if (info.tokens >= MIN_SHOWN_TOKENS) {
+				if (options.showExitCode && info.code !== 0) {
+					parts.push(`exit ${info.code}`);
+				}
+				if (info.tokens >= options.minTokens) {
 					parts.push(`~${info.tokens} tokens`);
 				}
 			}
