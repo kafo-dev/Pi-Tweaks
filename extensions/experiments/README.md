@@ -53,10 +53,11 @@ model passes no timeout of its own.
 Every option is required. With `"enabled": true` the section has to list all
 three, as in the example at the top of this file; a missing option, or a value
 that breaks its rule, registers nothing and reports one error per problem when
-the session starts. `timeoutSeconds` is a positive number of seconds, at most
-2147483.647, the ceiling of a 32-bit timer; `maxLines` and `maxBytes` are
-positive integers. The mode changes which tools the model has, so a fallback
-value is never used in place of one the section did not set.
+the session starts, and `/pi-tweaks list` shows the experiment as switched on
+but unusable, with the same messages. `timeoutSeconds` is a positive number of
+seconds, at most 2147483.647, the ceiling of a 32-bit timer; `maxLines` and
+`maxBytes` are positive integers. The mode changes which tools the model has,
+so a fallback value is never used in place of one the section did not set.
 
 The `bash` row is collapsed. The collapsed row holds `$ ` and the command,
 whitespace collapsed to a single line and cut to the viewport width, and no

@@ -160,6 +160,18 @@ const REQUIRED_OPTIONS: readonly RequiredOption[] = [
 	},
 ];
 
+/**
+ * The problems with the `experiment-minimal-mode` section, for `/pi-tweaks
+ * list`, which cannot see this module's state. The file is read here rather
+ * than shared, because pi gives each extension its own module cache. An empty
+ * list means the section is complete; a section that is off reports nothing.
+ */
+export function minimalModeConfigErrors(): string[] {
+	if (!isExperimentEnabled(EXTENSION)) return [];
+	const config = readConfig(readSection(EXTENSION));
+	return config.kind === "errors" ? config.messages : [];
+}
+
 /** The settings of the section, or the problems that stop them being read. */
 type MinimalModeConfig =
 	| { kind: "options"; options: MinimalModeOptions }

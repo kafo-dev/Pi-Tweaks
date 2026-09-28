@@ -108,11 +108,12 @@ that lives with the rest of the extension's settings.
 ```
 
 `list` is the command's own subcommand: it reads `pi.extensions` and the
-sections above, so it names the extensions whose switch is off and the ones
-whose section `pi-tweaks.json` lacks. A subcommand is named after the extension
-that answers it and calls a function that extension exports; a subcommand whose
-extension is off says so instead of reporting work that would not happen. On
-its own, `/pi-tweaks` prints the subcommands that are available.
+sections above, so it reports the extensions that register something, the ones
+that are switched off, and any that are switched on but unusable, with the
+reasons. A subcommand is named after the extension that answers it and calls a
+function that extension exports; a subcommand whose extension is off says so
+instead of reporting work that would not happen. On its own, `/pi-tweaks`
+prints the subcommands that are available.
 
 ## Contents
 

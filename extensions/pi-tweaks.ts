@@ -15,7 +15,10 @@
  * Everything a subcommand needs is therefore read from disk at call time.
  *
  * `list` is the command's own: it reads `pi.extensions` and answers whether
- * each extension would register anything. A subcommand whose extension is off
+ * each extension would register anything. A section can be switched on and
+ * still leave its extension off, so a section that checks its own settings
+ * exports the check and is listed in `CONFIG_CHECKS` below; its reasons are
+ * reported instead of a plain "enabled". A subcommand whose extension is off
  * says so, rather than report work that extension would not do.
  * `"enabled": false` under `pi-tweaks` in `pi-tweaks.json` removes the whole
  * command.
@@ -29,8 +32,10 @@ import {
 	configFilePath,
 	isExtensionEnabled,
 	isPackagedExtensionEnabled,
+	type PackagedExtension,
 	packagedExtensions,
 } from "../lib/pi-tweaks-config";
+import { minimalModeConfigErrors } from "./experiments/minimal-mode";
 import { runPruneSessions } from "./experiments/prune-sessions";
 import { runNotify } from "./notify/index";
 import { reportPinnedDocuments } from "./pin-document";
@@ -80,10 +85,37 @@ const SUBCOMMANDS: Array<[name: string, subcommand: Subcommand]> = [
 	],
 ];
 
-/** Whether the extension named here registers anything: off, on, or unknown. */
-function extensionState(name: string): boolean | undefined {
+/**
+ * The sections whose extension reports more than the `enabled` switch: a
+ * section can be switched on and still leave its extension off, and `list`
+ * would otherwise call that enabled. Each check reads the file at call time,
+ * like everything else here.
+ */
+const CONFIG_CHECKS: Record<string, () => string[]> = {
+	"experiment-minimal-mode": minimalModeConfigErrors,
+};
+
+/** How an extension stands: registering, switched off, or switched on and unusable. */
+type ExtensionState = "on" | "off" | "misconfigured";
+
+/** The state of a packaged extension, and the reasons it registers nothing. */
+type ExtensionStatus = { state: ExtensionState; errors: string[] };
+
+/** The state of one packaged extension. */
+function statusOf(extension: PackagedExtension): ExtensionStatus {
+	if (!isPackagedExtensionEnabled(extension)) {
+		return { state: "off", errors: [] };
+	}
+	const errors = CONFIG_CHECKS[extension.name]?.() ?? [];
+	return errors.length > 0
+		? { state: "misconfigured", errors }
+		: { state: "on", errors: [] };
+}
+
+/** The state of the extension named here, or undefined when the manifest lacks it. */
+function extensionState(name: string): ExtensionStatus | undefined {
 	const extension = packagedExtensions()?.find((entry) => entry.name === name);
-	return extension ? isPackagedExtensionEnabled(extension) : undefined;
+	return extension === undefined ? undefined : statusOf(extension);
 }
 
 /** Report whether each packaged extension registers anything. */
@@ -96,21 +128,36 @@ function list(ctx: ExtensionCommandContext): void {
 		);
 		return;
 	}
-	const named = (on: boolean) =>
-		extensions
-			.filter((extension) => isPackagedExtensionEnabled(extension) === on)
-			.map((extension) => extension.name);
-	const enabled = named(true);
-	const disabled = named(false);
-	const listed = (names: string[]) =>
-		names.length > 0 ? names.join(", ") : "none";
+	const statuses = extensions.map((extension) => ({
+		...statusOf(extension),
+		name: extension.name,
+	}));
+	const named = (state: ExtensionState) => {
+		const names = statuses
+			.filter((entry) => entry.state === state)
+			.map((entry) => entry.name);
+		return names.length > 0 ? names.join(", ") : "none";
+	};
+	const on = statuses.filter((entry) => entry.state === "on");
+	const lines = [
+		`config: ${configFilePath()}`,
+		`enabled (${on.length} of ${extensions.length}): ${named("on")}`,
+		`disabled: ${named("off")}`,
+	];
+	const misconfigured = statuses.filter(
+		(entry) => entry.state === "misconfigured",
+	);
+	if (misconfigured.length > 0) {
+		lines.push(
+			`switched on, unusable (${misconfigured.length}): ${misconfigured.map((entry) => entry.name).join(", ")}`,
+			...misconfigured.flatMap((entry) =>
+				entry.errors.map((error) => `  ${error}`),
+			),
+		);
+	}
 	ctx.ui.notify(
-		[
-			`config: ${configFilePath()}`,
-			`enabled (${enabled.length} of ${extensions.length}): ${listed(enabled)}`,
-			`disabled: ${listed(disabled)}`,
-		].join("\n"),
-		"info",
+		lines.join("\n"),
+		misconfigured.length > 0 ? "warning" : "info",
 	);
 }
 
@@ -147,11 +194,16 @@ export default function piTweaks(pi: ExtensionAPI) {
 				return;
 			}
 			const [, subcommand] = match;
-			if (extensionState(subcommand.extension) === false) {
+			const status = extensionState(subcommand.extension);
+			if (status?.state === "off") {
 				ctx.ui.notify(
 					`${subcommand.extension} is disabled in ${configFilePath()}`,
 					"warning",
 				);
+				return;
+			}
+			if (status?.state === "misconfigured") {
+				ctx.ui.notify(status.errors.join("\n"), "error");
 				return;
 			}
 			await subcommand.handler(rest, ctx);
