@@ -31,28 +31,41 @@
  *     estimate is four characters per token.
  *
  * `bash` runs through `pi.exec`, so its output is bounded: past `maxLines`
- * lines total (default 1024, split 512 at each end) or `maxBytes` bytes
- * (default 32768), the middle is dropped and the full output is written to a
- * temp file named in the marker. Output with few lines but too many bytes is
- * cut at the byte budget instead. The command timeout defaults to
- * `timeoutSeconds` (32) when the model passes none.
+ * lines total (split evenly between the two ends) or `maxBytes` bytes, the
+ * middle is dropped and the full output is written to a temp file named in the
+ * marker. Output with few lines but too many bytes is cut at the byte budget
+ * instead. Both budgets are fixed by the config, so the model cannot raise them
+ * for a call, and there is no value that turns truncation off: a budget wide
+ * enough never to be reached is the way to ask for the whole output. The
+ * command timeout applies when the model passes none.
  *
  * `pi-bash-timeout` fills the same `timeout`, so enable only one: with both on,
  * the value depends on extension load order. An extension cannot disable
  * another, so this one warns on `session_start` when pi-bash-timeout is still
  * on.
  *
- * Config, all under `experiment-minimal-mode` in `pi-tweaks.json`:
- * `timeoutSeconds` (32), `maxLines` (1024, 512 at each end), and `maxBytes`
- * (32768).
+ * Config, all under `experiment-minimal-mode` in `pi-tweaks.json`. With
+ * `"enabled": true` the section has to list every option: `timeoutSeconds`
+ * (seconds, at most 2147483.647), `maxLines` (lines in total, split between the
+ * two ends), and `maxBytes` (bytes in total). The mode changes what the model
+ * can do, so a fallback is a value the user never chose: a missing option, or
+ * one that breaks its rule, registers nothing and reports one error per problem
+ * at session start.
  *
  * The extension is listed in the package manifest, so pi loads it, but it
  * registers nothing until enabled by hand:
  *
- *   { "experiment-minimal-mode": { "enabled": true } }
+ *   {
+ *     "experiment-minimal-mode": {
+ *       "enabled": true,
+ *       "timeoutSeconds": 32,
+ *       "maxLines": 1024,
+ *       "maxBytes": 32768
+ *     }
+ *   }
  *
- * `"enabled": false`, a missing section, and any other value all leave it off.
- * See the Experiment README and pi-tweaks-config.ts.
+ * `"enabled": false`, a missing section, and any other value all leave it off
+ * silently. See the Experiment README and pi-tweaks-config.ts.
  */
 
 import { randomBytes } from "node:crypto";
@@ -78,7 +91,6 @@ import {
 import { Type } from "typebox";
 import {
 	isExperimentEnabled,
-	numberValue,
 	readSection,
 	type Section,
 } from "../../lib/pi-tweaks-config";
@@ -110,24 +122,81 @@ interface MinimalModeOptions {
 	maxBytes: number;
 }
 
-/** The settings of the `experiment-minimal-mode` section, with defaults. */
-function minimalModeOptions(section: Section | null): MinimalModeOptions {
-	return {
-		timeoutSeconds: numberValue(
-			section,
-			"timeoutSeconds",
-			DEFAULT_BASH_TIMEOUT_SECONDS,
-			{ positive: true, atMost: MAX_TIMEOUT_SECONDS },
-		),
-		maxLines: numberValue(section, "maxLines", DEFAULT_MAX_LINES, {
-			positive: true,
-			integer: true,
-		}),
-		maxBytes: numberValue(section, "maxBytes", DEFAULT_MAX_BYTES, {
-			positive: true,
-			integer: true,
-		}),
+/** One option the section has to set. */
+type RequiredOption = {
+	/** Key in the section, and the name an error message uses. */
+	key: keyof MinimalModeOptions;
+	/** The rule, as an error message states it. */
+	rule: string;
+	/** Whether a present value satisfies the rule; narrows it to a number. */
+	accepts: (value: unknown) => value is number;
+};
+
+/**
+ * Every option of the section, in error-message order. The guard holds the
+ * rule, so an error message and the check that produced it cannot drift apart.
+ */
+const REQUIRED_OPTIONS: readonly RequiredOption[] = [
+	{
+		key: "timeoutSeconds",
+		rule: `a positive number of seconds, at most ${MAX_TIMEOUT_SECONDS}`,
+		accepts: (value): value is number =>
+			typeof value === "number" &&
+			Number.isFinite(value) &&
+			value > 0 &&
+			value <= MAX_TIMEOUT_SECONDS,
+	},
+	{
+		key: "maxLines",
+		rule: "a positive integer",
+		accepts: (value): value is number =>
+			typeof value === "number" && Number.isInteger(value) && value > 0,
+	},
+	{
+		key: "maxBytes",
+		rule: "a positive integer",
+		accepts: (value): value is number =>
+			typeof value === "number" && Number.isInteger(value) && value > 0,
+	},
+];
+
+/** The settings of the section, or the problems that stop them being read. */
+type MinimalModeConfig =
+	| { kind: "options"; options: MinimalModeOptions }
+	| { kind: "errors"; messages: string[] };
+
+/**
+ * Read the section strictly: with `"enabled": true` every option has to be
+ * listed and satisfy its rule. A section that omits one, or carries a value
+ * that breaks its rule, comes back as one message per problem, and the caller
+ * registers nothing.
+ */
+function readConfig(section: Section | null): MinimalModeConfig {
+	const options: MinimalModeOptions = {
+		timeoutSeconds: DEFAULT_BASH_TIMEOUT_SECONDS,
+		maxLines: DEFAULT_MAX_LINES,
+		maxBytes: DEFAULT_MAX_BYTES,
 	};
+	const messages: string[] = [];
+	for (const option of REQUIRED_OPTIONS) {
+		const value = section?.[option.key];
+		if (value === undefined) {
+			messages.push(
+				`${EXTENSION}: "${option.key}" is missing; with "enabled": true the section must set it to ${option.rule}`,
+			);
+		} else if (option.accepts(value)) {
+			options[option.key] = value;
+		} else {
+			messages.push(
+				`${EXTENSION}: "${option.key}" is ${JSON.stringify(value)}, but it must be ${option.rule}`,
+			);
+		}
+	}
+	// The starting values only give `options` its type; a section that reached
+	// them with a value missing never gets here.
+	return messages.length > 0
+		? { kind: "errors", messages }
+		: { kind: "options", options };
 }
 
 // One read tool per cwd, created lazily and reused across calls.
@@ -473,7 +542,19 @@ type BashRenderers = Pick<
 export default function (pi: ExtensionAPI) {
 	if (!isExperimentEnabled(EXTENSION)) return;
 
-	const options = minimalModeOptions(readSection(EXTENSION));
+	const config = readConfig(readSection(EXTENSION));
+	if (config.kind === "errors") {
+		// The runtime is not available during load, so the errors wait for the
+		// first session; registering nothing is what leaves the mode off.
+		pi.on("session_start", (_event, ctx) => {
+			for (const message of config.messages) {
+				ctx.ui.notify(message, "error");
+			}
+		});
+		return;
+	}
+
+	const options = config.options;
 
 	pi.registerTool({
 		name: MEDIA_TOOL,

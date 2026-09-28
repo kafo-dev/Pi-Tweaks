@@ -44,11 +44,19 @@ removed from the active set. `media` delegates to the built-in `read` tool and
 ones, so text and images keep working while the prompt does not advertise
 behavior the mode drops.
 
-`bash` bounds its output: past `maxLines` lines total (default 1024, split 512
-at each end) or `maxBytes` bytes (default 32768), the middle is dropped and the
-full output is written to a temp file named in the marker. Output with few
-lines but too many bytes is cut at the byte budget instead. The default command
-timeout is 32 seconds.
+`bash` bounds its output: past `maxLines` lines total (split evenly between the
+two ends) or `maxBytes` bytes, the middle is dropped and the full output is
+written to a temp file named in the marker. Output with few lines but too many
+bytes is cut at the byte budget instead. `timeoutSeconds` applies when the
+model passes no timeout of its own.
+
+Every option is required. With `"enabled": true` the section has to list all
+three, as in the example at the top of this file; a missing option, or a value
+that breaks its rule, registers nothing and reports one error per problem when
+the session starts. `timeoutSeconds` is a positive number of seconds, at most
+2147483.647, the ceiling of a 32-bit timer; `maxLines` and `maxBytes` are
+positive integers. The mode changes which tools the model has, so a fallback
+value is never used in place of one the section did not set.
 
 The `bash` row is collapsed. The collapsed row holds `$ ` and the command,
 whitespace collapsed to a single line and cut to the viewport width, and no
@@ -158,7 +166,12 @@ disable another, so disable the packaged extension in the same file:
 
 ```json
 {
-  "experiment-minimal-mode": { "enabled": true },
+  "experiment-minimal-mode": {
+    "enabled": true,
+    "timeoutSeconds": 32,
+    "maxLines": 1024,
+    "maxBytes": 32768
+  },
   "pi-bash-timeout": { "enabled": false }
 }
 ```

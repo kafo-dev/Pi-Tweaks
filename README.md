@@ -84,6 +84,11 @@ directory when the document is under it, `~/…` when it is under the home
 directory, and absolute otherwise. With both false the document text is
 appended as-is.
 
+`experiment-minimal-mode` is stricter than the rest: with `"enabled": true` its
+section must list `timeoutSeconds`, `maxLines`, and `maxBytes`, or it registers
+nothing and reports the problems when the session starts. See
+[extensions/experiments](extensions/experiments/README.md).
+
 Settings written by an extension (`/pi-tweaks notify`) merge into the file, so
 the other sections and the `enabled` switch survive.
 
