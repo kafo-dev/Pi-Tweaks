@@ -149,6 +149,36 @@ Popping a tool result, then the assistant message that asked for it, leaves the
 branch ending on a tool call with no result, and pi sends the branch to the
 provider without repairing the pair.
 
+## `url.ts`
+
+Hypothesis: a link that scrolled past is worth reaching without scrolling back,
+and the address is the part to take, not the sentence around it.
+
+`/url` opens the same picker as `/snippet`, over links instead of code: one tab
+for markdown links, one for bare URLs. Tab switches tabs, arrows move, and the
+most recently printed link comes first. A markdown row shows the host and the
+link text; a bare row shows the host and the path. Enter copies the address to
+the clipboard — the brackets and the link text stay behind — and Escape closes
+the picker.
+
+The source is the text of user and assistant messages on the active branch,
+fenced code blocks included, because a URL in a command is often the one worth
+copying. Tool results are skipped, so a link inside a fetched page cannot bury
+the links of the conversation.
+
+A URL is recognised by its scheme (`https://`, `ftp://`, `mailto:`, …); a bare
+host such as `www.example.com` is not listed. Punctuation glued to an address
+by the sentence around it is trimmed, and a closing bracket is trimmed only
+when the URL holds no opener for it, so `/wiki/Foo_(bar)` survives and
+`(see https://example.com/a)` loses its bracket. A URL written both ways is
+listed once, in the markdown tab.
+
+```json
+{
+  "experiment-url": { "enabled": true }
+}
+```
+
 ## `prune-sessions.ts`
 
 Hypothesis: an unnamed session that has seen no use for three months is dead

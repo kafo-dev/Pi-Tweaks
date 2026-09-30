@@ -21,7 +21,8 @@
 			"./extensions/snippet.ts",
 			"./extensions/experiments/minimal-mode.ts",
 			"./extensions/experiments/prune-sessions.ts",
-			"./extensions/experiments/pop.ts"
+			"./extensions/experiments/pop.ts",
+			"./extensions/experiments/url.ts"
 		],
 		"skills": [
 			"./skills/browser-tools",
