@@ -6,15 +6,7 @@ registers nothing until enabled by hand in `pi-tweaks.json`:
 
 ```json
 {
-  "experiment-minimal-mode": {
-    "enabled": true,
-    "timeoutSeconds": 32,
-    "maxLines": 1024,
-    "maxBytes": 32768,
-    "minSeconds": 2,
-    "minTokens": 128,
-    "showExitCode": true
-  }
+  "experiment-pop": { "enabled": true }
 }
 ```
 
@@ -27,79 +19,6 @@ moved to [`.archived/`](../../.archived/) once the hypothesis is settled. A
 settled idea that proves beneficial graduates by moving the file next to the
 packaged extensions and dropping the `experiment-` prefix from its
 `pi-tweaks.json` section.
-
-## `minimal-mode.ts`
-
-Hypotheses: a smaller tool surface cuts the choices the model makes per turn,
-and a one-line `bash` row keeps the command visible while the output stays out
-of the way until it is asked for.
-
-After the extension loads, the active tools are:
-
-| Tool | Role |
-|------|------|
-| `media` | reads files, including images; the built-in `read` under a name that signals the intended role for audio and video |
-| `bash` | everything else — `sed` and `patch` for file changes, plus `fd`, `rg`, and arbitrary commands |
-
-The built-in `read`, `write`, `edit`, `find`, `grep`, and `ls` tools are
-removed from the active set. `media` delegates to the built-in `read` tool and
-`bash` runs through `pi.exec`, and both replace their descriptions with shorter
-ones, so text and images keep working while the prompt does not advertise
-behavior the mode drops.
-
-`bash` bounds its output: past `maxLines` lines total or `maxBytes` bytes, the
-result keeps the head, a run from the middle, and the tail:
-
-```
-  1 first line
-  2 second line
-...
-  9 ninth line
- 10 tenth line
-...
- 20 last line
-[the output was truncated, each line was prefixed with its absolute number, file: /tmp/pi-bash-<hex>.log]
-```
-
-Every kept line is prefixed with its number in the original output, a line
-reading `...` stands in for each run of dropped lines, and the footer names the
-temp file holding the whole output, so an omitted part is one
-`sed -n 'N,Mp' <file>` away. The line budget splits in three, and so does the
-byte budget; a slice whose first line does not fit its share is cut.
-`timeoutSeconds` applies when the model passes no timeout of its own.
-
-stdout and stderr reach one pipe — the shell runs `exec 2>&1` before the command
-— so the text reads in arrival order, the way a terminal shows it. Nothing marks
-which stream a line came from, and the whole output is held in memory before it
-is bounded.
-
-Every option is required. With `"enabled": true` the section has to list all
-six, as in the example at the top of this file; a missing option, or a value
-that breaks its rule, registers nothing and reports one error per problem when
-the session starts, and `/pi-tweaks list` shows the experiment as switched on
-but unusable, with the same messages. `timeoutSeconds` is a positive number of
-seconds, at most 2147483.647, the ceiling of a 32-bit timer; `maxLines` and
-`maxBytes` are positive integers; `minSeconds` is a non-negative number of
-seconds and `minTokens` a non-negative integer, so zero shows that part every
-time; `showExitCode` is a boolean. The mode changes which tools the model has,
-so a fallback value is never used in place of one the section did not set.
-
-The `bash` row is collapsed. The collapsed row holds `$ ` and the command,
-whitespace collapsed to a single line and cut to the viewport width, and no
-output, successful or failed. Expanding the row with `ctrl+o`, or by clicking it,
-untruncates the command in place and shows the full output below it. The
-click is handled by the row itself, so it also works while the command is
-still streaming, before the call has a result.
-
-The command line ends with the command's wall-clock time rounded to the
-nearest second in Go's `time.Duration` format, its exit code, and an output
-estimate at four characters per token. The row drops the parts the config says
-are not worth showing: the time below `minSeconds` seconds, `exit 0`, and an
-estimate below `minTokens` tokens, while `showExitCode` false drops the exit
-code even when it is not zero. So a fast, successful, small command keeps just
-its command, while `$ make test (2.4s, exit 1, ~140 tokens)` shows all three
-parts, and the same command with `minTokens` 200 shows
-`$ make test (2.4s, exit 1)`.
 
 ## `pop.ts`
 
@@ -216,25 +135,3 @@ The XDG trash lives at `$XDG_DATA_HOME/Trash` (default
 `~/.local/share/Trash`), which the sandbox does not bind read-write. A move
 from a sandboxed pi therefore needs `~/.local/share/Trash` in `rw-paths.txt`; a
 failed move is reported and nothing is lost.
-
-## Conflicts
-
-`minimal-mode` sets a default bash timeout, which `pi-bash-timeout` also does.
-Enable only one: with both on, the value depends on extension load order, and
-the experiment warns on startup while both are still on. An extension cannot
-disable another, so disable the packaged extension in the same file:
-
-```json
-{
-  "experiment-minimal-mode": {
-    "enabled": true,
-    "timeoutSeconds": 32,
-    "maxLines": 1024,
-    "maxBytes": 32768,
-    "minSeconds": 2,
-    "minTokens": 128,
-    "showExitCode": true
-  },
-  "pi-bash-timeout": { "enabled": false }
-}
-```

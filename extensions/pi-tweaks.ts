@@ -35,7 +35,6 @@ import {
 	type PackagedExtension,
 	packagedExtensions,
 } from "../lib/pi-tweaks-config";
-import { minimalModeConfigErrors } from "./experiments/minimal-mode";
 import { runPruneSessions } from "./experiments/prune-sessions";
 import { runNotify } from "./notify/index";
 import { reportPinnedDocuments } from "./pin-document";
@@ -91,9 +90,7 @@ const SUBCOMMANDS: Array<[name: string, subcommand: Subcommand]> = [
  * would otherwise call that enabled. Each check reads the file at call time,
  * like everything else here.
  */
-const CONFIG_CHECKS: Record<string, () => string[]> = {
-	"experiment-minimal-mode": minimalModeConfigErrors,
-};
+const CONFIG_CHECKS: Record<string, () => string[]> = {};
 
 /** How an extension stands: registering, switched off, or switched on and unusable. */
 type ExtensionState = "on" | "off" | "misconfigured";

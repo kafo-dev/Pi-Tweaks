@@ -97,7 +97,7 @@ export type PackagedExtension = {
  * Section name and kind of an extension, from its `pi.extensions` path. The
  * name follows the file: the `.ts` suffix goes, `index` stands for its
  * directory, and an experiment keeps that directory as a prefix, so
- * `extensions/experiments/minimal-mode.ts` is `experiment-minimal-mode`.
+ * `extensions/experiments/prune-sessions.ts` is `experiment-prune-sessions`.
  */
 function parseExtensionPath(path: string): PackagedExtension {
 	const bare = path.replace(/^\.\//, "").replace(/\.ts$/, "");
@@ -105,7 +105,7 @@ function parseExtensionPath(path: string): PackagedExtension {
 	// Extensions live under `extensions/`, experiments under a further
 	// `experiments/` there. The section name drops both directory levels:
 	// `extensions/notify/index.ts` is `notify`, and
-	// `extensions/experiments/minimal-mode.ts` is `experiment-minimal-mode`.
+	// `extensions/experiments/prune-sessions.ts` is `experiment-prune-sessions`.
 	const afterRoot = parts[0] === "extensions" ? parts.slice(1) : parts;
 	const experiment = afterRoot.length > 1 && afterRoot[0] === "experiments";
 	const file = (experiment ? afterRoot.slice(1) : afterRoot).join("/");

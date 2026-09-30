@@ -53,6 +53,16 @@ source is worth keeping, and its cost is the reason the extension is not: a
 custom compaction prompt has to re-derive guards pi already carries and track
 pi's compaction internals to stay correct.
 
+The `minimal-mode` extension came fifth. The hypothesis was that a smaller
+tool surface cuts the choices the model makes per turn, and that a one-line
+`bash` row keeps the command in view while the output waits until it is asked
+for. The extension reduced the active tool set to `media` and `bash` by
+overriding the built-ins, so it rebuilt a slice of the harness inside an
+extension: tool registration and removal, a `read` tool under another name,
+short prompt descriptions, and the output bound. The judgement was that a
+minimal harness written from scratch serves better than an extension that
+reimplements half of the core features of a coding harness.
+
 The source is kept for two reasons:
 
 - The approach can inspire a future tool, or the idea can be revisited under
@@ -89,3 +99,4 @@ pi install .archived/<name>.ts
 | [`pi-timestamps.ts`](pi-timestamps.ts) | Appends a date and time stamp to each sent prompt and to the final answer of a turn. The stamp is added before pi expands a prompt template, so the template argument parser reads it as extra arguments and a `${1:-default}` argument loses its default. |
 | [`pi-stop.ts`](pi-stop.ts) | Adds `/stop`, which aborts the running turn — the same abort as Escape. Commands are dispatched before pi decides whether an input is a steering message, so the command also works while the agent is streaming. It emits `turn-aborted` on pi's shared event bus so pi-notify can skip the alert for the settle it causes. |
 | [`pi-compaction-prompt.ts`](pi-compaction-prompt.ts) | Replaces pi's compaction prompt with the body of the Markdown file named by `pi-compaction-prompt.promptFile`. A missing or unreadable file leaves pi's default compaction in place. The request carries its own system prompt, split-turn marker, retained tail, and thinking filter, because the file supplies none of them. |
+| [`minimal-mode.ts`](minimal-mode.ts) | Reduces the active tools to `media` and `bash`: `media` delegates to the built-in read so text and images keep working, and `bash` replaces the built-in tool with a collapsed row, a bounded output, and a default timeout. Config lives under `experiment-minimal-mode`. |

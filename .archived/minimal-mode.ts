@@ -31,35 +31,24 @@
  *     time rounded to the nearest second, in Go's `time.Duration` format, and
  *     the estimate is four characters per token.
  *
- * `bash` runs through `pi.exec`, so its output is bounded: past `maxLines`
- * lines total or `maxBytes` bytes, the result keeps the head, a run from the
- * middle, and the tail, in this shape:
+ * `bash` runs through `pi.exec`, so its output is bounded: past `maxBytes`
+ * bytes, the result keeps that many bytes from the head of the output and
+ * closes with a footer naming the temp file that holds the whole output, in
+ * this shape:
  *
- *    1 first line
- *    2 second line
- *    ...
- *    9 ninth line
- *   10 tenth line
- *    ...
- *   20 last line
- *   [the output was truncated, each line was prefixed with its absolute number,
- *   file: /tmp/pi-bash-<hex>.log]
+ *   first line
+ *   second line
+ *   [the output was truncated, the full output is in /tmp/pi-bash-<hex>.log]
  *
- * Every kept line is prefixed with its number in the original output, a line
- * reading `...` stands in for each run of dropped lines, and the footer names
- * the temp file holding the whole output, so an omitted part is one
- * `sed -n 'N,Mp' <file>` away. The line budget splits in three, and so does the
- * byte budget; a slice whose first line does not fit its share is cut. Both
- * budgets are fixed by the config, so the model cannot raise them for a call,
+ * `maxBytes` is fixed by the config, so the model cannot raise it for a call,
  * and there is no value that turns truncation off: a budget wide enough never
  * to be reached is the way to ask for the whole output. The command timeout
  * applies when the model passes none.
  *
  * stdout and stderr reach one pipe: the shell runs `exec 2>&1` before the
  * command, so the two streams arrive interleaved in the order a terminal would
- * show them, and a line number addresses that merged text. Nothing marks which
- * stream a line came from, and the whole output is held in memory before it is
- * bounded, since `pi.exec` returns a string.
+ * show them. Nothing marks which stream a line came from, and the whole output
+ * is held in memory before it is bounded, since `pi.exec` returns a string.
  *
  * `pi-bash-timeout` fills the same `timeout`, so enable only one: with both on,
  * the value depends on extension load order. An extension cannot disable
@@ -68,13 +57,13 @@
  *
  * Config, all under `experiment-minimal-mode` in `pi-tweaks.json`. With
  * `"enabled": true` the section has to list every option: `timeoutSeconds`
- * (seconds, at most 2147483.647), `maxLines` (lines in total, split across the
- * three slices), `maxBytes` (bytes in total), `minSeconds` (seconds, from
- * which the row shows the time), `minTokens` (tokens, from which it shows the
- * estimate), and `showExitCode` (whether it shows a non-zero exit code). The
- * mode changes what the model can do, so a fallback is a value the user never
- * chose: a missing option, or one that breaks its rule, registers nothing and
- * reports one error per problem at session start.
+ * (seconds, at most 2147483.647), `maxBytes` (bytes kept from the head, before
+ * the output is truncated), `minSeconds` (seconds, from which the row shows the
+ * time), `minTokens` (tokens, from which it shows the estimate), and
+ * `showExitCode` (whether it shows a non-zero exit code). The mode changes
+ * what the model can do, so a fallback is a value the user never chose: a
+ * missing option, or one that breaks its rule, registers nothing and reports
+ * one error per problem at session start.
  *
  * The extension is listed in the package manifest, so pi loads it, but it
  * registers nothing until enabled by hand:
@@ -83,7 +72,6 @@
  *     "experiment-minimal-mode": {
  *       "enabled": true,
  *       "timeoutSeconds": 32,
- *       "maxLines": 1024,
  *       "maxBytes": 32768,
  *       "minSeconds": 2,
  *       "minTokens": 128,
@@ -118,15 +106,14 @@ import {
 	isExperimentEnabled,
 	readSection,
 	type Section,
-} from "../../lib/pi-tweaks-config";
+} from "../lib/pi-tweaks-config";
 
 const EXTENSION = "experiment-minimal-mode";
 const MEDIA_TOOL = "media"; // replaces the built-in `read`
 const DISABLED_TOOLS = new Set(["read", "write", "edit", "find", "grep", "ls"]);
 
 const DEFAULT_BASH_TIMEOUT_SECONDS = 32; // when the model passes none
-const DEFAULT_MAX_LINES = 1024; // total lines before truncating, split per end
-const DEFAULT_MAX_BYTES = 32 * 1024; // total bytes before truncating
+const DEFAULT_MAX_BYTES = 32 * 1024; // bytes kept from the head before truncating
 const MAX_TIMEOUT_SECONDS = 2147483647 / 1000; // 32-bit setTimeout ceiling
 const TEMP_FILE_PREFIX = "pi-bash"; // matches the built-in bash tool
 const ELLIPSIS = "…"; // one cell wide, unlike "..."
@@ -144,7 +131,6 @@ const META_CAP = 200; // tool rows whose suffix data is kept
 /** Resolved settings for the mode. */
 interface MinimalModeOptions {
 	timeoutSeconds: number;
-	maxLines: number;
 	maxBytes: number;
 	minSeconds: number;
 	minTokens: number;
@@ -189,12 +175,6 @@ const REQUIRED_NUMBERS: readonly OptionRule<NumberKey>[] = [
 			Number.isFinite(value) &&
 			value > 0 &&
 			value <= MAX_TIMEOUT_SECONDS,
-	},
-	{
-		key: "maxLines",
-		rule: "a positive integer",
-		accepts: (value): value is number =>
-			typeof value === "number" && Number.isInteger(value) && value > 0,
 	},
 	{
 		key: "maxBytes",
@@ -275,7 +255,6 @@ function readOptions<K extends keyof MinimalModeOptions>(
 function readConfig(section: Section | null): MinimalModeConfig {
 	const options: MinimalModeOptions = {
 		timeoutSeconds: DEFAULT_BASH_TIMEOUT_SECONDS,
-		maxLines: DEFAULT_MAX_LINES,
 		maxBytes: DEFAULT_MAX_BYTES,
 		minSeconds: DEFAULT_MIN_SECONDS,
 		minTokens: DEFAULT_MIN_TOKENS,
@@ -448,25 +427,6 @@ function resultText(result: { content: readonly unknown[] }): string {
 	return part?.text ?? "";
 }
 
-/** One run of kept lines: where it starts in the original output, and its text. */
-type KeptRun = {
-	/** 1-based number of the first kept line. */
-	start: number;
-	/** The kept lines, each prefixed with its own number. */
-	lines: string[];
-};
-
-/** Slices a truncated result shows: a head, a run from the middle, and a tail. */
-const SLICES = 3;
-
-/** Bytes the ellipsis costs, so a cut line can be held to its budget. */
-const ELLIPSIS_BYTES = Buffer.byteLength(ELLIPSIS);
-
-/** The prefix that makes a line addressable: its number, right-aligned, and a tab. */
-function numbered(number: number, width: number, line: string): string {
-	return `${String(number).padStart(width)}\t${line}`;
-}
-
 /** The first `budget` bytes of `text`, dropping a character the cut splits. */
 function headBytes(text: string, budget: number): string {
 	const bytes = Buffer.from(text, "utf8").subarray(0, Math.max(0, budget));
@@ -474,86 +434,20 @@ function headBytes(text: string, budget: number): string {
 }
 
 /**
- * The last `budget` bytes of `text`. A character the cut splits becomes a
- * replacement character, which is the price of not scanning the whole line.
- */
-function tailBytes(text: string, budget: number): string {
-	const bytes = Buffer.from(text, "utf8");
-	return new TextDecoder("utf-8").decode(
-		bytes.subarray(Math.max(0, bytes.length - budget)),
-	);
-}
-
-/**
- * Take lines from one end of the offered range while they fit `budget` bytes,
- * numbering each one. A range whose first line does not fit keeps that line cut
- * to the budget, so a slice always shows something; the caller drops a run with
- * no lines. The kept lines are contiguous, so the caller can turn the numbers
- * around them into the omitted ranges.
- */
-function takeLines(
-	lines: readonly string[],
-	first: number,
-	count: number,
-	budget: number,
-	width: number,
-	fromEnd: boolean,
-): KeptRun | undefined {
-	const kept: string[] = [];
-	let bytes = 0;
-	for (let offset = 0; offset < count; offset += 1) {
-		const number = fromEnd ? first + count - 1 - offset : first + offset;
-		const text = lines[number - 1];
-		const cost = Buffer.byteLength(numbered(number, width, text));
-		if (bytes + cost <= budget) {
-			kept.push(numbered(number, width, text));
-			bytes += cost;
-			continue;
-		}
-		if (kept.length === 0) {
-			const room = Math.max(0, budget - width - ELLIPSIS_BYTES - 1);
-			const cut = fromEnd
-				? `${ELLIPSIS}${tailBytes(text, room)}`
-				: `${headBytes(text, room)}${ELLIPSIS}`;
-			kept.push(numbered(number, width, cut));
-		}
-		break;
-	}
-	if (fromEnd) kept.reverse();
-	if (kept.length === 0) return undefined;
-	// Taking from the end leaves a run that no longer starts where the range did.
-	const start = fromEnd ? first + count - kept.length : first;
-	return { start, lines: kept };
-}
-
-/** The line that stands in for a run of dropped lines. */
-const OMITTED_LINE = "...";
-
-/**
  * The line that closes a truncated result. It names the file holding the whole
- * output and the numbering the kept lines carry, which is all a `sed -n 'N,Mp'`
- * against that file needs.
+ * output, which is all a `sed -n 'N,Mp'` against that file needs.
  */
 function truncationFooter(file: string): string {
-	return `[the output was truncated, each line was prefixed with its absolute number, file: ${file}]`;
+	return `[the output was truncated, the full output is in ${file}]`;
 }
 
 /**
- * Keep the head, a run from the middle, and the tail of `output` once it
- * exceeds `maxLines` lines or `maxBytes` bytes. Every kept line carries its
- * number in the original output, a line reading `...` stands in for each run of
- * dropped lines, and a footer names the temp file holding the whole output, so
- * an omitted part is one `sed -n 'N,Mp' <file>` away. The line budget splits in
- * three, and so does the byte budget, which is what keeps all three slices in
- * the result.
+ * Cut `output` to its first `maxBytes` bytes once it exceeds them, and close it
+ * with a footer naming the temp file that holds the whole output, so a dropped
+ * part is one `sed -n 'N,Mp' <file>` away.
  */
-function truncateOutput(
-	output: string,
-	maxLines: number,
-	maxBytes: number,
-): string {
-	const lines = output ? output.split("\n") : [];
-	if (lines.length <= maxLines && Buffer.byteLength(output) <= maxBytes) {
+function truncateOutput(output: string, maxBytes: number): string {
+	if (Buffer.byteLength(output) <= maxBytes) {
 		return output;
 	}
 
@@ -563,45 +457,7 @@ function truncateOutput(
 	);
 	writeFileSync(file, output);
 
-	const total = lines.length;
-	const width = String(total).length;
-	// Few lines but too many bytes: the byte budget is what binds, and the line
-	// budget only caps it. The head takes the remainder, and the tail never
-	// takes lines the head has already spent, so one or two lines still split.
-	const shown = Math.min(maxLines, total);
-	const share = Math.ceil(shown / SLICES);
-	const headCount = Math.min(share, shown);
-	const tailCount = Math.min(share, Math.max(0, shown - headCount));
-	const centerCount = Math.max(0, shown - headCount - tailCount);
-
-	// The middle slice sits at the centre of what the head and the tail leave.
-	const freeFirst = headCount + 1;
-	const freeCount = Math.max(0, total - headCount - tailCount);
-	const centerFirst =
-		freeFirst + Math.floor(Math.max(0, freeCount - centerCount) / 2);
-	const centerLines = Math.min(centerCount, freeCount);
-
-	const byteShare = Math.floor(maxBytes / SLICES);
-	const budget = [maxBytes - byteShare * (SLICES - 1), byteShare, byteShare];
-
-	const runs = [
-		takeLines(lines, 1, headCount, budget[0], width, false),
-		takeLines(lines, centerFirst, centerLines, budget[1], width, false),
-		takeLines(lines, total - tailCount + 1, tailCount, budget[2], width, true),
-	].filter((run): run is KeptRun => run !== undefined);
-
-	// The numbers around a gap say what the gap holds, so it needs no range of
-	// its own; the footer names the file and closes the result.
-	const parts: string[] = [];
-	let next = 1;
-	for (const run of runs) {
-		if (run.start > next) parts.push(OMITTED_LINE);
-		parts.push(...run.lines);
-		next = run.start + run.lines.length;
-	}
-	if (next <= total) parts.push(OMITTED_LINE);
-	parts.push(truncationFooter(file));
-	return parts.join("\n");
+	return `${headBytes(output, maxBytes)}\n${truncationFooter(file)}`;
 }
 
 /**
@@ -679,11 +535,7 @@ function boundedBashTool(
 				},
 			);
 			const elapsedNs = Number(process.hrtime.bigint() - startedAt);
-			const output = truncateOutput(
-				combinedOutput(result),
-				options.maxLines,
-				options.maxBytes,
-			);
+			const output = truncateOutput(combinedOutput(result), options.maxBytes);
 			const text = output || "(no output)";
 			rememberBashMeta(toolCallId, {
 				elapsedNs,
