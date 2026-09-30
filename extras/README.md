@@ -44,8 +44,9 @@ config asks for it. The config is read on the host, from a file beside the
 agent directory: `~/.pi/wrapper-config.txt` with the default agent directory,
 or the parent of `PI_CODING_AGENT_DIR` otherwise, like `rw-paths.txt`. Blank
 lines and lines starting with `#` are ignored; a line containing the word
-`auto-resume` turns the feature on for the run, and every other line is
-ignored.
+`auto-resume` turns the feature on for the run. The file holds the wrapper's
+other settings too, such as [`hide-home`](#hidden-home); a line that names none
+of them is ignored.
 
 ```text
 # turn on session auto-resume
@@ -171,6 +172,36 @@ becomes writable by the agent, so list only paths the agent may modify; listing
 `/` or `$HOME` defeats the sandbox. A single file works as well as a directory,
 for example a notes file the agent maintains. By default the file itself is
 outside the writable set, so the agent cannot widen its own mounts.
+
+### Hidden home
+
+The wrapper mounts the whole filesystem read-only, so by default the agent can
+read every file under `$HOME`, even though it can write only a few. A
+`hide-home` line in `wrapper-config.txt` takes the rest of the home directory
+out of view: the sandbox mounts an empty read-only tmpfs over `$HOME`, then
+binds back the paths the wrapper itself uses.
+
+```text
+# hide the home directory, except for the mounted paths
+hide-home
+```
+
+Under `$HOME` the agent then sees only:
+
+- the agent directory, the cache directory, the skills tree (`.agents`), and
+  the scratchpad, which the wrapper mounts on every run;
+- every path listed in `rw-paths.txt`;
+- the working directory, when the wrapper mounts it read-write.
+
+Everything else is gone rather than read-only. A directory that is not listed
+does not appear at all, and the parent directories of a listed path appear as
+empty directories holding only that path. Writing into the hidden part fails
+with a read-only filesystem error, so the write cannot land in the tmpfs and
+disappear when the session ends.
+
+Tools that keep their state under `$HOME` lose it too. `~/.ssh`, `~/.gitconfig`,
+`~/.config/git`, and `~/.gnupg` are not mounted, so a `git` command that needs
+one of them fails until the path is listed in `rw-paths.txt`.
 
 ### Environment variables
 

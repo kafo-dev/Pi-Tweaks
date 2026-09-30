@@ -2,11 +2,14 @@
 # Pi wrapper: run the agent inside a bubblewrap sandbox.
 #
 # Pi has no built-in sandbox and runs tools with the permissions of the user
+# Pi has no built-in sandbox and runs tools with the permissions of the user
 # account. This wrapper binds the whole filesystem read-only and re-binds only
 # the project directory, a scratchpad, and a few state directories read-write,
 # so a session cannot write anywhere else under $HOME. Started from $HOME (or
 # an ancestor), the project directory stays read-only and the agent is pointed
-# at the scratchpad instead.
+# at the scratchpad instead. A `hide-home` line in the wrapper config hides
+# the rest of the home directory: it becomes an empty read-only directory
+# holding only the paths this wrapper mounts.
 
 # Resolve the real pi binary. A user or npm prefix installs it outside
 # /usr/bin, so search PATH. Skip this wrapper when it shadows `pi` on PATH,
@@ -69,13 +72,13 @@ scratch_dir="$pi_dir/scratchpad"
 cwd=$(pwd -P)
 home_real=$(cd "$HOME" && pwd -P)
 
-# Session auto-resume. Off unless a line of the wrapper config names it, so the
-# default stays the current behavior. The config sits beside the agent
-# directory (default "$HOME/.pi/wrapper-config.txt"), splits one entry per
-# line, and ignores blank lines and lines starting with '#'. A line containing
-# the word "auto-resume" turns the feature on for the run. See
-# extras/README.md.
+# Wrapper config: one setting per line, read from a file beside the agent
+# directory (default "$HOME/.pi/wrapper-config.txt"). Blank lines and lines
+# starting with '#' are ignored. A line containing the word "auto-resume"
+# turns session auto-resume on for the run; a line containing "hide-home"
+# hides the home directory. Every other line is ignored. See extras/README.md.
 auto_resume=0
+hide_home=0
 wrapper_config="$pi_dir/wrapper-config.txt"
 if [ -f "$wrapper_config" ]; then
 	while IFS= read -r line || [ -n "$line" ]; do
@@ -85,6 +88,7 @@ if [ -f "$wrapper_config" ]; then
 		esac
 		case "$line" in
 		*auto-resume*) auto_resume=1 ;;
+		*hide-home*) hide_home=1 ;;
 		esac
 	done <"$wrapper_config"
 fi
@@ -241,6 +245,13 @@ else
 	set -- "$real_pi" "$@"
 fi
 
+# hide-home: remount the home directory read-only. Prepending now puts this
+# last of the mounts, after the paths bound back into it, so a write into the
+# hidden part fails instead of landing in a tmpfs that dies with the session.
+if [ "$hide_home" = 1 ]; then
+	set -- --remount-ro "$HOME" "$@"
+fi
+
 if [ -f "$rw_file" ]; then
 	while IFS= read -r path || [ -n "$path" ]; do
 		path=$(printf '%s\n' "$path" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
@@ -285,6 +296,22 @@ if [ "$home_readonly" = 0 ]; then
 fi
 
 set -- \
+	--bind "$agent_dir" "$agent_dir" \
+	--bind "$cache_dir" "$cache_dir" \
+	--bind "$agents_dir" "$agents_dir" \
+	--bind "$scratch_dir" "$scratch_dir" \
+	"$@"
+
+# hide-home: an empty home directory. Everything under $HOME disappears, and
+# the mounts after this put back the paths this wrapper uses: the state
+# directories bound just above, every rw-paths entry, and the working
+# directory. The tmpfs has to follow `--ro-bind / /` and precede those
+# mounts, or a later mount covers it or it covers them.
+if [ "$hide_home" = 1 ]; then
+	set -- --tmpfs "$HOME" "$@"
+fi
+
+set -- \
 	--unshare-all \
 	--share-net \
 	--die-with-parent \
@@ -293,10 +320,6 @@ set -- \
 	--proc /proc \
 	--dev /dev \
 	--tmpfs /tmp \
-	--bind "$agent_dir" "$agent_dir" \
-	--bind "$cache_dir" "$cache_dir" \
-	--bind "$agents_dir" "$agents_dir" \
-	--bind "$scratch_dir" "$scratch_dir" \
 	"$@"
 
 exec "$bwrap" "$@"
