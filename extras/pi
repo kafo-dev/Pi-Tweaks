@@ -189,6 +189,8 @@ done
 # Extra read-write paths, one per line, next to the agent directory (default
 # "$HOME/.pi/rw-paths.txt"). Blank lines and lines starting with '#' are
 # ignored, '~' expands to $HOME, and a missing path is skipped (--bind-try).
+# A device node, or any path under /dev, is mounted with --dev-bind-try
+# instead, since --bind marks the mount nodev and blocks the device.
 # The file is read here, on the host, so it need not be reachable inside the
 # sandbox.
 rw_file="$pi_dir/rw-paths.txt"
@@ -259,7 +261,21 @@ if [ -f "$rw_file" ]; then
 			continue
 			;;
 		esac
-		set -- --bind-try "$path" "$path" "$@"
+		# A device node needs a device bind: --bind mounts with nodev
+		# set, which denies access to the nodes under it. Anything
+		# under /dev counts, because the sandbox replaces /dev with a
+		# fresh tmpfs that holds no device the host has not bound.
+		case "$path" in
+		/dev | /dev/*) bind_opt=--dev-bind-try ;;
+		*)
+			if [ -c "$path" ] || [ -b "$path" ]; then
+				bind_opt=--dev-bind-try
+			else
+				bind_opt=--bind-try
+			fi
+			;;
+		esac
+		set -- "$bind_opt" "$path" "$path" "$@"
 	done <"$rw_file"
 fi
 

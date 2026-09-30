@@ -160,15 +160,17 @@ parent directory:
 ```
 
 `~` expands to `$HOME`. Each entry is mounted with `--bind-try`, so a path that
-does not exist is skipped and the wrapper still starts. An entry is taken
-literally: do not quote it, even when the path contains spaces. Non-absolute
-entries are ignored with a warning. The wrapper reads the file on the host
-before entering the sandbox, so the file itself does not need to be reachable
-inside it. Every listed path becomes writable by the agent, so list only paths
-the agent may modify; listing `/` or `$HOME` defeats the sandbox. A single file
-works as well as a directory, for example a notes file the agent maintains.
-By default the file itself is outside the writable set, so the agent cannot
-widen its own mounts.
+does not exist is skipped and the wrapper still starts. A device node, and any
+path under `/dev`, is mounted with `--dev-bind-try` instead: the sandbox mounts
+a fresh tmpfs over `/dev`, and `--bind` sets `nodev` on the mount, which makes
+the device nodes under it deny access. An entry is taken literally: do not quote
+it, even when the path contains spaces. Non-absolute entries are ignored with a
+warning. The wrapper reads the file on the host before entering the sandbox, so
+the file itself does not need to be reachable inside it. Every listed path
+becomes writable by the agent, so list only paths the agent may modify; listing
+`/` or `$HOME` defeats the sandbox. A single file works as well as a directory,
+for example a notes file the agent maintains. By default the file itself is
+outside the writable set, so the agent cannot widen its own mounts.
 
 ### Environment variables
 
