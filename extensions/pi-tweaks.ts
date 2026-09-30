@@ -15,10 +15,7 @@
  * Everything a subcommand needs is therefore read from disk at call time.
  *
  * `list` is the command's own: it reads `pi.extensions` and answers whether
- * each extension would register anything. A section can be switched on and
- * still leave its extension off, so a section that checks its own settings
- * exports the check and is listed in `CONFIG_CHECKS` below; its reasons are
- * reported instead of a plain "enabled". A subcommand whose extension is off
+ * each extension would register anything. A subcommand whose extension is off
  * says so, rather than report work that extension would not do.
  * `"enabled": false` under `pi-tweaks` in `pi-tweaks.json` removes the whole
  * command.
@@ -84,33 +81,16 @@ const SUBCOMMANDS: Array<[name: string, subcommand: Subcommand]> = [
 	],
 ];
 
-/**
- * The sections whose extension reports more than the `enabled` switch: a
- * section can be switched on and still leave its extension off, and `list`
- * would otherwise call that enabled. Each check reads the file at call time,
- * like everything else here.
- */
-const CONFIG_CHECKS: Record<string, () => string[]> = {};
-
-/** How an extension stands: registering, switched off, or switched on and unusable. */
-type ExtensionState = "on" | "off" | "misconfigured";
-
-/** The state of a packaged extension, and the reasons it registers nothing. */
-type ExtensionStatus = { state: ExtensionState; errors: string[] };
+/** How an extension stands: registering, or switched off. */
+type ExtensionState = "on" | "off";
 
 /** The state of one packaged extension. */
-function statusOf(extension: PackagedExtension): ExtensionStatus {
-	if (!isPackagedExtensionEnabled(extension)) {
-		return { state: "off", errors: [] };
-	}
-	const errors = CONFIG_CHECKS[extension.name]?.() ?? [];
-	return errors.length > 0
-		? { state: "misconfigured", errors }
-		: { state: "on", errors: [] };
+function statusOf(extension: PackagedExtension): ExtensionState {
+	return isPackagedExtensionEnabled(extension) ? "on" : "off";
 }
 
 /** The state of the extension named here, or undefined when the manifest lacks it. */
-function extensionState(name: string): ExtensionStatus | undefined {
+function extensionState(name: string): ExtensionState | undefined {
 	const extension = packagedExtensions()?.find((entry) => entry.name === name);
 	return extension === undefined ? undefined : statusOf(extension);
 }
@@ -126,7 +106,7 @@ function list(ctx: ExtensionCommandContext): void {
 		return;
 	}
 	const statuses = extensions.map((extension) => ({
-		...statusOf(extension),
+		state: statusOf(extension),
 		name: extension.name,
 	}));
 	const named = (state: ExtensionState) => {
@@ -141,21 +121,7 @@ function list(ctx: ExtensionCommandContext): void {
 		`enabled (${on.length} of ${extensions.length}): ${named("on")}`,
 		`disabled: ${named("off")}`,
 	];
-	const misconfigured = statuses.filter(
-		(entry) => entry.state === "misconfigured",
-	);
-	if (misconfigured.length > 0) {
-		lines.push(
-			`switched on, unusable (${misconfigured.length}): ${misconfigured.map((entry) => entry.name).join(", ")}`,
-			...misconfigured.flatMap((entry) =>
-				entry.errors.map((error) => `  ${error}`),
-			),
-		);
-	}
-	ctx.ui.notify(
-		lines.join("\n"),
-		misconfigured.length > 0 ? "warning" : "info",
-	);
+	ctx.ui.notify(lines.join("\n"), "info");
 }
 
 /** The usage text, built from the subcommands this file knows. */
@@ -192,15 +158,11 @@ export default function piTweaks(pi: ExtensionAPI) {
 			}
 			const [, subcommand] = match;
 			const status = extensionState(subcommand.extension);
-			if (status?.state === "off") {
+			if (status === "off") {
 				ctx.ui.notify(
 					`${subcommand.extension} is disabled in ${configFilePath()}`,
 					"warning",
 				);
-				return;
-			}
-			if (status?.state === "misconfigured") {
-				ctx.ui.notify(status.errors.join("\n"), "error");
 				return;
 			}
 			await subcommand.handler(rest, ctx);
