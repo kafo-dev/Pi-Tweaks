@@ -66,7 +66,7 @@ they track later pi or Pi-Tweaks changes.
 ## Using an archived tool
 
 An archived extension may import the shared configuration in
-[`pi-tweaks-config.ts`](../pi-tweaks-config.ts) and read its settings from
+[`pi-tweaks-config.ts`](../lib/pi-tweaks-config.ts) and read its settings from
 `pi-tweaks.json` under the section named after the file.
 
 Load one for a single session without installing it:
