@@ -7,9 +7,10 @@
 # the project directory, a scratchpad, and a few state directories read-write,
 # so a session cannot write anywhere else under $HOME. Started from $HOME (or
 # an ancestor), the project directory stays read-only and the agent is pointed
-# at the scratchpad instead. A `hide-home` line in the wrapper config hides
-# the rest of the home directory: it becomes an empty read-only directory
-# holding only the paths this wrapper mounts.
+# at the scratchpad instead. The wrapper's own config files are mounted
+# read-only, whatever else is writable. A `hide-home` line in the wrapper
+# config hides the rest of the home directory: it becomes an empty read-only
+# directory holding only the paths this wrapper mounts.
 
 # Resolve the real pi binary. A user or npm prefix installs it outside
 # /usr/bin, so search PATH. Skip this wrapper when it shadows `pi` on PATH,
@@ -250,6 +251,20 @@ fi
 # hidden part fails instead of landing in a tmpfs that dies with the session.
 if [ "$hide_home" = 1 ]; then
 	set -- --remount-ro "$HOME" "$@"
+fi
+
+# The wrapper's own two files are mounted read-only. Prepending here puts both
+# after every configured bind, so a listed directory that holds one of them
+# cannot make it writable, and the agent can still read the file the sandbox
+# notice tells it to ask the user to extend. `--ro-bind` rather than
+# `--ro-bind-try`: a bind that fails has to stop the run, not leave the file
+# writable. A file that does not exist is skipped, which is the common case for
+# the wrapper config.
+if [ -f "$rw_file" ]; then
+	set -- --ro-bind "$rw_file" "$rw_file" "$@"
+fi
+if [ -f "$wrapper_config" ]; then
+	set -- --ro-bind "$wrapper_config" "$wrapper_config" "$@"
 fi
 
 if [ -f "$rw_file" ]; then

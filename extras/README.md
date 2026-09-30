@@ -166,12 +166,13 @@ path under `/dev`, is mounted with `--dev-bind-try` instead: the sandbox mounts
 a fresh tmpfs over `/dev`, and `--bind` sets `nodev` on the mount, which makes
 the device nodes under it deny access. An entry is taken literally: do not quote
 it, even when the path contains spaces. Non-absolute entries are ignored with a
-warning. The wrapper reads the file on the host before entering the sandbox, so
-the file itself does not need to be reachable inside it. Every listed path
-becomes writable by the agent, so list only paths the agent may modify; listing
-`/` or `$HOME` defeats the sandbox. A single file works as well as a directory,
-for example a notes file the agent maintains. By default the file itself is
-outside the writable set, so the agent cannot widen its own mounts.
+warning. The wrapper reads the file on the host before entering the sandbox,
+and mounts the file itself read-only, after every configured bind. The agent can
+read the list it is told to ask the user to extend, and neither the file nor
+`wrapper-config.txt` becomes writable when a listed directory holds it. Every
+listed path becomes writable by the agent, so list only paths the agent may
+modify; listing `/` or `$HOME` defeats the sandbox. A single file works as well
+as a directory, for example a notes file the agent maintains.
 
 ### Hidden home
 
@@ -190,6 +191,7 @@ Under `$HOME` the agent then sees only:
 
 - the agent directory, the cache directory, the skills tree (`.agents`), and
   the scratchpad, which the wrapper mounts on every run;
+- `rw-paths.txt` and `wrapper-config.txt`, read-only;
 - every path listed in `rw-paths.txt`;
 - the working directory, when the wrapper mounts it read-write.
 
