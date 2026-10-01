@@ -8,7 +8,7 @@
  * supported way to give a built-in tool a default.
  *
  * Config: `pi-bash-timeout.timeoutSeconds` in `pi-tweaks.json` overrides the
- * built-in 10 seconds; `"enabled": false` turns the extension off. See
+ * built-in 32 seconds; `"enabled": false` turns the extension off. See
  * pi-tweaks-config.ts for the file and its location.
  */
 
@@ -23,7 +23,7 @@ import {
 } from "../lib/pi-tweaks-config";
 
 const EXTENSION = "pi-bash-timeout";
-const DEFAULT_BASH_TIMEOUT_SECONDS = 10; // when the model passes none
+const DEFAULT_BASH_TIMEOUT_SECONDS = 32; // when the model passes none
 const MAX_TIMEOUT_SECONDS = 2147483647 / 1000; // 32-bit setTimeout ceiling
 
 export default function (pi: ExtensionAPI) {
