@@ -34,10 +34,9 @@
  * directory, `$XDG_CACHE_HOME/pi-tweaks` (see lib/pi-tweaks-cache.mjs).
  *
  * The XDG trash lives at `$XDG_DATA_HOME/Trash` (default
- * `~/.local/share/Trash`). It is outside the paths the sandbox binds
- * read-write, so add `~/.local/share/Trash` to `rw-paths.txt` before
- * auto-pruning can move anything from a sandboxed pi; a failed move is
- * reported and nothing is lost.
+ * `~/.local/share/Trash`). The sandbox wrapper binds it read-write, so a move
+ * from a sandboxed pi lands normally; a failed move is reported and nothing is
+ * lost.
  */
 
 import type { Dirent } from "node:fs";

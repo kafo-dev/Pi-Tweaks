@@ -91,6 +91,7 @@ management subcommand (`install`, `remove`, `uninstall`, `update`, `list`,
 | `$PI_CODING_AGENT_DIR` (default `~/.pi/agent`) | settings, sessions, trust, packages, auth |
 | scratchpad, beside the agent directory (default `~/.pi/scratchpad`) | agent scratch files; the fallback when started from `$HOME` |
 | `$XDG_CACHE_HOME` (default `~/.cache`) | tool caches, browser profiles |
+| `$XDG_DATA_HOME/Trash` (default `~/.local/share/Trash`) | the XDG trash; the prune-sessions experiment moves an old session file here instead of deleting it |
 | `~/.agents` | global skills (`~/.agents/skills`) |
 
 Everything else is read-only. Language and package-manager directories are
@@ -189,8 +190,8 @@ hide-home
 
 Under `$HOME` the agent then sees only:
 
-- the agent directory, the cache directory, the skills tree (`.agents`), and
-  the scratchpad, which the wrapper mounts on every run;
+- the agent directory, the cache directory, the skills tree (`.agents`), the
+  scratchpad, and the XDG trash, which the wrapper mounts on every run;
 - `rw-paths.txt` and `wrapper-config.txt`, read-only;
 - every path listed in `rw-paths.txt`;
 - the working directory, when the wrapper mounts it read-write.
@@ -212,6 +213,7 @@ one of them fails until the path is listed in `rw-paths.txt`.
 | `BWRAP` | Set to `0` to skip the sandbox. The wrapper then warns and runs `pi` unsandboxed with the same arguments. |
 | `PI_CODING_AGENT_DIR` | Override the agent directory that is bound read-write. Default `~/.pi/agent`. The scratchpad, `rw-paths.txt`, and `wrapper-config.txt` move to its parent. |
 | `XDG_CACHE_HOME` | Override the cache directory that is bound read-write. Default `~/.cache`. Pi-Tweaks keeps its runtime state in `<cacheDir>/pi-tweaks`: the session locks and the time of the last automatic prune round. |
+| `XDG_DATA_HOME` | Override the data directory whose `Trash` is bound read-write. Default `~/.local/share`. |
 
 ### Notes and limitations
 

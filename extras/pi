@@ -58,6 +58,12 @@ bwrap=/usr/bin/bwrap
 agent_dir=${PI_CODING_AGENT_DIR:-"$HOME/.pi/agent"}
 cache_dir=${XDG_CACHE_HOME:-"$HOME/.cache"}
 
+# XDG data directory. The prune-sessions experiment moves an old session file
+# to its trash rather than deleting it, so the wrapper binds the trash
+# read-write; nothing else under the data directory is exposed.
+data_dir=${XDG_DATA_HOME:-"$HOME/.local/share"}
+trash_dir="$data_dir/Trash"
+
 # Global skills tree; writable so skills can be installed and updated.
 agents_dir="$HOME/.agents"
 
@@ -187,7 +193,7 @@ case "$home_real" in
 	;;
 esac
 
-for d in "$agent_dir" "$cache_dir" "$agents_dir" "$scratch_dir"; do
+for d in "$agent_dir" "$cache_dir" "$agents_dir" "$scratch_dir" "$trash_dir"; do
 	mkdir -p "$d"
 done
 
@@ -315,6 +321,7 @@ set -- \
 	--bind "$cache_dir" "$cache_dir" \
 	--bind "$agents_dir" "$agents_dir" \
 	--bind "$scratch_dir" "$scratch_dir" \
+	--bind "$trash_dir" "$trash_dir" \
 	"$@"
 
 # hide-home: an empty home directory. Everything under $HOME disappears, and

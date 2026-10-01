@@ -132,6 +132,6 @@ the session locks, in the Pi-Tweaks cache directory: runtime state belongs in
 the cache, not in the agent directory that holds configuration.
 
 The XDG trash lives at `$XDG_DATA_HOME/Trash` (default
-`~/.local/share/Trash`), which the sandbox does not bind read-write. A move
-from a sandboxed pi therefore needs `~/.local/share/Trash` in `rw-paths.txt`; a
-failed move is reported and nothing is lost.
+`~/.local/share/Trash`). The sandbox wrapper binds it read-write, so a move
+from a sandboxed pi lands normally; a failed move is reported and nothing is
+lost.
