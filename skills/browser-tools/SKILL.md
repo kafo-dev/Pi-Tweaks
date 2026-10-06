@@ -232,6 +232,22 @@ The refresh excludes that directory, so provisioned extensions survive seeding.
 The script uses Chromium's `external_crx` mechanism rather than
 `--load-extension`; see [PATCHES.md](PATCHES.md) for the comparison.
 
+
+## Device Emulation (Mobile)
+
+```bash
+{baseDir}/browser-emulate.js --list
+{baseDir}/browser-emulate.js iphone-14
+{baseDir}/browser-emulate.js pixel-7 --landscape
+{baseDir}/browser-emulate.js --reset
+```
+
+Set a persistent mobile emulation (viewport, device pixel ratio, touch, user
+agent) for the active tab. Presets: `iphone-se`, `iphone-14`, `pixel-7`,
+`galaxy-s20`. `browser-nav.js`, `browser-eval.js`, `browser-screenshot.js`,
+`browser-pick.js`, `browser-cookies.js`, and `browser-content.js` re-apply the
+preference, so a reload or a `--new` tab keeps the device. `--reset` clears it.
+
 ## Navigate
 
 ```bash
@@ -254,9 +270,14 @@ Execute JavaScript in the active tab. Code runs in async context. Use this to ex
 
 ```bash
 {baseDir}/browser-screenshot.js
+{baseDir}/browser-screenshot.js --full-page
+{baseDir}/browser-screenshot.js --device iphone-14
+{baseDir}/browser-screenshot.js --device pixel-7 --landscape --full-page
 ```
 
 Capture current viewport and return temporary file path. Use this to visually inspect page state or verify UI changes.
+`--full-page` captures the full document height; `--device <preset>` applies a
+temporary mobile emulation for that screenshot only.
 
 ## Pick Elements
 

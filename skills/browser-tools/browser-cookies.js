@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import puppeteer from "puppeteer-core";
+import { applyActiveEmulation } from "./browser-emulation.js";
 
 const b = await Promise.race([
 	puppeteer.connect({
@@ -20,6 +21,7 @@ if (!p) {
 	console.error("✗ No active tab found");
 	process.exit(1);
 }
+await applyActiveEmulation(p);
 
 const cookies = await p.cookies();
 

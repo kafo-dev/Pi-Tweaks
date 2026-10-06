@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import puppeteer from "puppeteer-core";
+import { applyActiveEmulation } from "./browser-emulation.js";
 
 const code = process.argv.slice(2).join(" ");
 if (!code) {
@@ -29,6 +30,7 @@ if (!p) {
 	console.error("✗ No active tab found");
 	process.exit(1);
 }
+await applyActiveEmulation(p);
 
 const result = await p.evaluate((c) => {
 	const AsyncFunction = (async () => {}).constructor;

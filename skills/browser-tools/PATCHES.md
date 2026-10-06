@@ -175,3 +175,25 @@ it reads `ps -eo pid=,command=`, keeps processes whose argv carries
 `--user-data-dir=~/.cache/browser-tools`, skips `--type=` children, and sends
 `SIGTERM`. It stops the browser on `:9222` by default and every agent browser
 with `--all`. The skill no longer needs the `pkill` recipe.
+
+## Patch 9 — Device emulation
+
+**Files:** [`browser-devices.js`](browser-devices.js),
+[`browser-emulation.js`](browser-emulation.js),
+[`browser-emulate.js`](browser-emulate.js) (added)
+
+`browser-emulate.js` sets a persistent preference
+(`~/.cache/browser-tools/emulation.json`) and applies it to the active tab:
+`--list`, `<device>`, `--landscape`, `--reset`. Presets: `iphone-se`,
+`iphone-14`, `pixel-7`, `galaxy-s20`. Emulation uses raw CDP
+(`Emulation.setDeviceMetricsOverride`, `setTouchEmulationEnabled`,
+`setUserAgentOverride`); `page.setUserAgent` is not used because Chromium
+rejects the partial `userAgentMetadata` that a platform-only override produces.
+
+`browser-nav.js`, `browser-eval.js`, `browser-screenshot.js`,
+`browser-pick.js`, `browser-cookies.js`, and `browser-content.js` re-apply the
+stored preference on each run, so a `--new` tab or a reload keeps the emulated
+device. `browser-screenshot.js` also gains `--full-page` and
+`--device <preset> [--landscape]`; a `--device` override applies to that
+screenshot only.
+

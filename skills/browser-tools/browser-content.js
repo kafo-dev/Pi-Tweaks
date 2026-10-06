@@ -5,6 +5,7 @@ import { Readability } from "@mozilla/readability";
 import { JSDOM } from "jsdom";
 import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
+import { applyActiveEmulation } from "./browser-emulation.js";
 
 // Global timeout - exit if script takes too long
 const TIMEOUT = 30000;
@@ -41,6 +42,7 @@ if (!p) {
 	console.error("✗ No active tab found");
 	process.exit(1);
 }
+await applyActiveEmulation(p);
 
 await Promise.race([
 	p.goto(url, { waitUntil: "networkidle2" }),

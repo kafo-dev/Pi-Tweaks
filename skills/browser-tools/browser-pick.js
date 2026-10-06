@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import puppeteer from "puppeteer-core";
+import { applyActiveEmulation } from "./browser-emulation.js";
 
 const message = process.argv.slice(2).join(" ");
 if (!message) {
@@ -28,6 +29,7 @@ if (!p) {
 	console.error("✗ No active tab found");
 	process.exit(1);
 }
+await applyActiveEmulation(p);
 
 // Inject pick() helper into current page
 await p.evaluate(() => {
