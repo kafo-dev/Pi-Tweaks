@@ -9,7 +9,10 @@ import {
 	clearDeviceEmulation,
 	resolveDevicePreset,
 } from "./browser-devices.js";
-import { applyActiveEmulation } from "./browser-emulation.js";
+import {
+	applyActiveEmulation,
+	applyActiveUserAgent,
+} from "./browser-emulation.js";
 
 const args = process.argv.slice(2);
 let fullPage = false;
@@ -67,6 +70,7 @@ if (!p) {
 
 if (devicePreset) {
 	await applyDevicePreset(p, devicePreset, { landscape });
+	await applyActiveUserAgent(p);
 } else {
 	await applyActiveEmulation(p);
 }

@@ -247,7 +247,25 @@ agent) for the active tab. Presets: `iphone-se`, `iphone-14`, `pixel-7`,
 `galaxy-s20`. `browser-nav.js`, `browser-eval.js`, `browser-screenshot.js`,
 `browser-pick.js`, `browser-cookies.js`, `browser-content.js`, and
 `browser-dismiss-cookies.js` re-apply the preference, so a reload or a `--new`
-tab keeps the device. `--reset` clears it.
+tab keeps the device. `--reset` clears the device and the user-agent override.
+
+## User-Agent Override
+
+```bash
+{baseDir}/browser-emulate.js --ua chrome
+{baseDir}/browser-emulate.js --ua "<user-agent string>"
+{baseDir}/browser-emulate.js --ua reset
+```
+
+Set a persistent user-agent override for the active tab. `chrome` sends the user
+agent of the running Chromium with its `HeadlessChrome` product token replaced
+by `Chrome`, which clears the bot checks that reject a headless browser; the
+version and the platform come from the running browser. Any other value goes
+out verbatim.
+
+The override outranks a device preset, so it stays in force while a preset is
+active. `--ua reset` clears the override and leaves the preset alone; `--reset`
+clears both.
 
 ## Navigate
 
@@ -347,6 +365,9 @@ Redirect the tail output to a file and query it when it grows large.
 
 ## Gotchas
 
+- Headless Chromium sends `HeadlessChrome` in its user agent, and a site that
+  checks for the token blocks the request. Run
+  `{baseDir}/browser-emulate.js --ua chrome` to send `Chrome` instead.
 - These scripts act on the **last page** (`(await b.pages()).at(-1)`). If the only
   open tab is a `chrome-extension://` page (e.g. an extension dashboard),
   `browser.pages()` can come back empty and you'll see `✗ No active tab found`.

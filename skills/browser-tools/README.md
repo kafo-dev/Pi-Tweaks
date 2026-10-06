@@ -46,8 +46,8 @@ See [PATCHES.md](PATCHES.md) for details. In short:
    [PATCHES.md](PATCHES.md), Patch 7.
 8. **Headless launch and stop** — `--headless` on both start scripts, and
    [`browser-stop.js`](browser-stop.js) to stop the agent browser.
-9. **Device emulation** — [`browser-emulate.js`](browser-emulate.js) sets a
-   persistent mobile preset applied by the other tools;
+9. **Page emulation** — [`browser-emulate.js`](browser-emulate.js) sets a
+   persistent mobile preset or user-agent override applied by the other tools;
    [`browser-screenshot.js`](browser-screenshot.js) gains `--full-page` and
    `--device`.
 10. **Cookie-consent dismissal** —
@@ -96,6 +96,8 @@ npm install          # scripts use puppeteer-core + the system browser
 ./browser-screenshot.js [--full-page] [--device iphone-14]
 ./browser-emulate.js --list
 ./browser-emulate.js iphone-14 [--landscape]
+./browser-emulate.js --ua chrome
+./browser-emulate.js --ua reset
 ./browser-emulate.js --reset
 ./browser-dismiss-cookies.js [--reject]
 ./browser-cookies.js

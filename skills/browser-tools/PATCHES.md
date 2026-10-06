@@ -186,18 +186,24 @@ with `--all`. The skill no longer needs the `pkill` recipe.
 
 `browser-emulate.js` sets a persistent preference
 (`~/.cache/browser-tools/emulation.json`) and applies it to the active tab:
-`--list`, `<device>`, `--landscape`, `--reset`. Presets: `iphone-se`,
-`iphone-14`, `pixel-7`, `galaxy-s20`. Emulation uses raw CDP
-(`Emulation.setDeviceMetricsOverride`, `setTouchEmulationEnabled`,
-`setUserAgentOverride`); `page.setUserAgent` is not used because Chromium
-rejects the partial `userAgentMetadata` that a platform-only override produces.
+`--list`, `<device>`, `--landscape`, `--ua <user-agent>`, `--ua reset`,
+`--reset`. Presets: `iphone-se`, `iphone-14`, `pixel-7`, `galaxy-s20`.
+
+A preset goes through raw CDP (`Emulation.setDeviceMetricsOverride`,
+`setTouchEmulationEnabled`, `setUserAgentOverride`) instead of
+`page.setUserAgent`, because Chromium rejects the partial `userAgentMetadata`
+that a platform-only override produces. The `--ua` override goes through
+`page.setUserAgent` and carries no platform, so it applies on top of a preset
+without disturbing the preset metrics. The value `chrome` resolves to the
+running browser with its `HeadlessChrome` product token replaced by `Chrome`.
 
 `browser-nav.js`, `browser-eval.js`, `browser-screenshot.js`,
 `browser-pick.js`, `browser-cookies.js`, `browser-content.js`, and
 `browser-dismiss-cookies.js` re-apply the stored preference on each run, so a
-`--new` tab or a reload keeps the emulated device. `browser-screenshot.js` also
-gains `--full-page` and `--device <preset> [--landscape]`; a `--device`
-override applies to that screenshot only.
+`--new` tab or a reload keeps the emulated device and the user agent.
+`browser-screenshot.js` also gains `--full-page` and
+`--device <preset> [--landscape]`; a `--device` override applies to that
+screenshot only.
 
 ## Patch 10 — Cookie-consent dismissal
 
