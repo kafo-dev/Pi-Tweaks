@@ -101,9 +101,8 @@ on that path, either by listing it in `rw-paths.txt` or by restarting with
 A second part of the note covers scratch files. `/tmp` is a private tmpfs that
 is wiped whenever the agent restarts, so the note sends the agent to the
 scratchpad instead, and tells it to create a subdirectory of the scratchpad for
-the session, keep its files there, and delete nothing outside that
-subdirectory. The scratchpad is shared by every session, so both rules keep
-concurrent agents out of each other's way.
+the session and keep its files there. The scratchpad is shared by every
+session, so the subdirectory keeps concurrent agents out of each other's way.
 
 The note travels as `--append-system-prompt` text, so the note itself needs no
 file. The wrapper writes one small lock file per run under
@@ -120,9 +119,8 @@ Like `rw-paths.txt`, the path follows the parent of `PI_CODING_AGENT_DIR`, so
 moving the agent directory moves the scratchpad with it.
 
 Concurrent agents share the scratchpad, and it outlives a session, so the
-sandbox notice tells each one to work inside a subdirectory of its own and to
-delete nothing outside it, including the scratchpad itself (see [Sandbox
-notice](#sandbox-notice)).
+sandbox notice tells each one to work inside a subdirectory of its own (see
+[Sandbox notice](#sandbox-notice)).
 
 ### Extra read-write paths
 
