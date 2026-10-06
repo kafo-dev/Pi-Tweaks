@@ -37,51 +37,25 @@ so the `PATH` search is what makes the wrapper work on those systems. The
 resolved binary is read through the sandbox's read-only root, so it does not
 need to be a system package.
 
-### Session auto-resume
+### Session locks
 
-The wrapper changes nothing about which session pi opens unless a wrapper
-config asks for it. The config is read on the host, from a file beside the
-agent directory: `~/.pi/wrapper-config.txt` with the default agent directory,
-or the parent of `PI_CODING_AGENT_DIR` otherwise, like `rw-paths.txt`. Blank
-lines and lines starting with `#` are ignored; a line containing the word
-`auto-resume` turns the feature on for the run. The file holds the wrapper's
-other settings too, such as [`hide-home`](#hidden-home); a line that names none
-of them is ignored.
+Pi keeps no lock on the session it has open: it opens the JSONL file only to
+append, so a second process cannot see that the session is in use. The wrapper
+writes a lock file per run instead, before pi starts, under
+`<cacheDir>/pi-tweaks/session-locks/`. A lock records the process id, the
+working directory, the start time, and the session file when `--session` names
+one.
 
-```text
-# turn on session auto-resume
-auto-resume
-```
+`extensions/experiments/prune-sessions.ts` reads the locks, so it does not move
+a session that a live process still holds. "Held" means a live pi process
+recorded a lock for that session, or was started after the session file was
+last written.
 
-With the feature on, and no session flag on the command line, the wrapper picks
-a session for the working directory before pi starts and passes it as
-`--session`:
-
-1. the most recently used named session that no live pi process holds;
-2. otherwise the most recently used session that no live pi process holds;
-3. otherwise nothing, and pi starts a new session.
-
-A name comes from `/name` or `--name`. "Held" means a live pi process recorded
-a lock for that session, or was started after the session file was last
-written; this is what `pi -c` cannot do, because `-c` always takes the most
-recent session even when another pi already has it open.
-
-Started from `$HOME` itself, the feature stays off: the home directory is not
-a project, so the only candidate there is whichever session under `$HOME` was
-used most recently.
-
-`extras/pi-session-pick.mjs` does the picking and writes one lock file per
-process under `<cacheDir>/pi-tweaks/session-locks/`. Locks of processes that
-have exited are removed the next time the locks are read, so they do not
-accumulate. Node must be on `PATH`; without it the wrapper starts no lock and
-picks no session, which is the default behavior.
-
-These arguments skip the pick, because they already name a session:
-`-c`/`--continue`, `-r`/`--resume`, `--session`, `--session-dir`,
-`--fork`, `--no-session`, `-n`/`--name`, and `PI_CODING_AGENT_SESSION_DIR`.
-An explicit `--session <path>` is still locked, so other runs avoid it. A
-management subcommand (`install`, `remove`, `uninstall`, `update`, `list`,
-`config`, `auth`) starts no session and is skipped.
+`extras/pi-session-pick.mjs` writes the lock. Locks of processes that have
+exited are removed the next time the locks are read, so they do not accumulate.
+Node must be on `PATH`; without it the wrapper starts no lock. A management
+subcommand (`install`, `remove`, `uninstall`, `update`,
+`list`, `config`, `auth`) starts no session and is not locked.
 
 ### What is writable
 
@@ -132,7 +106,7 @@ concurrent agents out of each other's way.
 The note travels as `--append-system-prompt` text, so the note itself needs no
 file. The wrapper writes one small lock file per run under
 `<cacheDir>/pi-tweaks/session-locks/`; see
-[Session auto-resume](#session-auto-resume).
+[Session locks](#session-locks).
 A management subcommand starts no session and gets no note.
 
 ### Scratchpad
