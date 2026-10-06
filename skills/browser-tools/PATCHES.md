@@ -138,3 +138,26 @@ Rejected alternative: loading the unpacked CRX with `--load-extension` plus
 `--disable-features=DisableLoadExtensionCommandLineSwitch`. It does not persist
 across launches, needs a launcher flag every run, and may show a developer-mode
 prompt; the `external_crx` mechanism used here does persist.
+
+## Patch 7 — survive a read-only `XDG_CONFIG_HOME`
+
+**File:** [`browser-start-linux.js`](browser-start-linux.js)
+
+Chromium derives its crash-dump directory from `XDG_CONFIG_HOME` (default
+`~/.config`) as `<config-home>/<product>/Crash Reports`, and passes it to
+`chrome_crashpad_handler` as `--database`. Inside the bubblewrap sandbox
+`~/.config` is mounted read-only: the directory cannot be created, the handler
+starts without `--database` and exits, and Chromium dies with `SIGTRAP` before
+opening a tab. The script reported `✗ Failed to connect to Chrome on :9222`.
+`--crash-dumps-dir` does not move the path, and `--disable-crash-reporter` and
+`--disable-breakpad` do not skip the handler.
+
+The start script probes the config home with a real write. When it is not
+writable, the child receives `XDG_CONFIG_HOME=~/.cache/browser-tools-xdg`,
+created on demand. `--user-data-dir` is passed explicitly, so the browser
+profile is unaffected and only crash reports move. A writable
+`XDG_CONFIG_HOME` is used unchanged.
+
+The alternative fix, listing `~/.config/chromium` in `~/.pi/rw-paths.txt`, fixes
+every Chromium launch in the sandbox but is a host change, not a repository
+change.

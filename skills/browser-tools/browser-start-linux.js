@@ -27,7 +27,7 @@
 //   BROWSER_APP_CLASS   Linux window class (Wayland app_id / X11 WM_CLASS); empty disables (default: Pi-Coding-Agent-Control-chromium)
 
 import { spawn, execSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import puppeteer from "puppeteer-core";
@@ -77,6 +77,7 @@ if (!profileDir) {
 
 // Dedicated profile for the agent. Persistent across runs, separate from yours.
 const AGENT_PROFILE = join(homedir(), ".cache", "browser-tools");
+const AGENT_XDG = join(homedir(), ".cache", "browser-tools-xdg");
 
 // Read the profile list from the agent profile's Local State. Returns
 // { lastUsed, profiles: { "<dir>": "<display name>" } }. Empty when the agent
@@ -193,6 +194,25 @@ function findUserProfile() {
 	);
 }
 
+// Chromium resolves its crash-dump directory from `XDG_CONFIG_HOME` (default
+// `~/.config`) as `<config-home>/<product>/Crash Reports` and passes it to
+// `chrome_crashpad_handler` as `--database`. On a read-only config home the
+// directory cannot be created, the handler exits, and Chromium dies with
+// SIGTRAP before opening a tab. `--crash-dumps-dir` does not move the path.
+// A probe write is used because a read-only mount may keep its writable mode
+// bits, so a permission check alone can pass.
+function canWriteConfigHome(dir) {
+	try {
+		mkdirSync(dir, { recursive: true });
+		const probe = join(dir, `.browser-tools-write-probe-${process.pid}`);
+		writeFileSync(probe, "");
+		rmSync(probe, { force: true });
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 if (listProfiles) {
 	printAgentProfiles();
 	process.exit(0);
@@ -270,6 +290,20 @@ if (knownDirs.length > 0 && !knownDirs.includes(profileDir) && profileDir !== AG
 	process.exit(1);
 }
 
+// The bubblewrap sandbox mounts `~/.config` read-only, so Chromium cannot
+// create its crash-dump directory there. Point the child at a writable config
+// home under the agent cache instead. `--user-data-dir` is passed explicitly,
+// so the browser profile is unaffected.
+let configHome = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
+if (!canWriteConfigHome(configHome)) {
+	if (!canWriteConfigHome(AGENT_XDG)) {
+		console.error(`✗ Chromium config home ${configHome} is read-only and ${AGENT_XDG} cannot be created.`);
+		process.exit(1);
+	}
+	console.log(`  ${configHome} is not writable; using ${AGENT_XDG} for Chromium's crash-dump directory.`);
+	configHome = AGENT_XDG;
+}
+
 const chromeArgs = [
 	"--remote-debugging-port=9222",
 	`--user-data-dir=${AGENT_PROFILE}`,
@@ -282,7 +316,11 @@ const chromeArgs = [
 // disables it; by default the agent's own class is used so its window is
 // identifiable and grouped apart from a normal Chromium.
 if (appClass) chromeArgs.push(`--class=${appClass}`);
-spawn(chrome, chromeArgs, { detached: true, stdio: "ignore" }).unref();
+spawn(chrome, chromeArgs, {
+	detached: true,
+	stdio: "ignore",
+	env: { ...process.env, XDG_CONFIG_HOME: configHome },
+}).unref();
 
 let connected = false;
 for (let i = 0; i < 30; i++) {

@@ -41,6 +41,9 @@ See [PATCHES.md](PATCHES.md) for details. In short:
    through Chromium's `External Extensions/` directory; see
    [`SKILL.md`](SKILL.md#extensions).
 
+7. **Read-only `XDG_CONFIG_HOME`** — the Linux start script falls back to a
+   writable Chromium config home, so the browser starts inside the sandbox. See
+   [PATCHES.md](PATCHES.md), Patch 7.
 ## Install into pi
 
 This directory is the skill declared by the Pi-Tweaks pi package. Install the

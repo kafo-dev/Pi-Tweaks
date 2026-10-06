@@ -104,6 +104,12 @@ opens. `--class <name>` (or `$BROWSER_APP_CLASS`) gives the window a custom Linu
 class — the Wayland toplevel `app_id` and the X11 `WM_CLASS` — defaulting to
 `Pi-Coding-Agent-Control-chromium`; an empty value disables it.
 
+Inside a read-only `XDG_CONFIG_HOME` (for example the bubblewrap sandbox, where
+`~/.config` is mounted read-only), Chromium cannot create its crash-dump
+directory and dies with `SIGTRAP`. The script then points Chromium's crash dumps
+at `~/.cache/browser-tools-xdg`; the browser profile, passed with
+`--user-data-dir`, is unaffected. See [PATCHES.md](PATCHES.md), Patch 7.
+
 ### Always use the cached agent profile
 
 By default the script opens the agent's own profile,
