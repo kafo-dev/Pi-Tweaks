@@ -161,3 +161,17 @@ profile is unaffected and only crash reports move. A writable
 The alternative fix, listing `~/.config/chromium` in `~/.pi/rw-paths.txt`, fixes
 every Chromium launch in the sandbox but is a host change, not a repository
 change.
+
+## Patch 8 — Headless launch and `browser-stop.js`
+
+**Files:** [`browser-start.js`](browser-start.js),
+[`browser-start-linux.js`](browser-start-linux.js),
+[`browser-stop.js`](browser-stop.js) (added)
+
+Both start scripts accept `--headless` (Chromium `--headless=new`).
+
+`browser-stop.js` stops the agent browser without matching the invoking shell:
+it reads `ps -eo pid=,command=`, keeps processes whose argv carries
+`--user-data-dir=~/.cache/browser-tools`, skips `--type=` children, and sends
+`SIGTERM`. It stops the browser on `:9222` by default and every agent browser
+with `--all`. The skill no longer needs the `pkill` recipe.

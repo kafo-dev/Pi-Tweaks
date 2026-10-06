@@ -44,6 +44,8 @@ See [PATCHES.md](PATCHES.md) for details. In short:
 7. **Read-only `XDG_CONFIG_HOME`** — the Linux start script falls back to a
    writable Chromium config home, so the browser starts inside the sandbox. See
    [PATCHES.md](PATCHES.md), Patch 7.
+8. **Headless launch and stop** — `--headless` on both start scripts, and
+   [`browser-stop.js`](browser-stop.js) to stop the agent browser.
 ## Install into pi
 
 This directory is the skill declared by the Pi-Tweaks pi package. Install the
@@ -70,11 +72,12 @@ npm install          # scripts use puppeteer-core + the system browser
 
 ```bash
 # macOS
-./browser-start.js [--profile]
+./browser-start.js [--headless] [--profile]
 
 # Linux
-./browser-start-linux.js [--profile] [--profile-directory <name>]
+./browser-start-linux.js [--headless] [--profile] [--profile-directory <name>]
 ./browser-start-linux.js --list-profiles
+./browser-stop.js
 ./browser-install-extension.js --id <extension-id>
 
 ./browser-nav.js https://example.com [--new] [--reload]

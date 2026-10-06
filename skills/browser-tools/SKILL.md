@@ -81,6 +81,7 @@ macOS (upstream script):
 
 ```bash
 {baseDir}/browser-start.js              # Fresh profile
+{baseDir}/browser-start.js --headless           # No visible window (agents)
 {baseDir}/browser-start.js --profile    # Copy user's profile (cookies, logins)
 ```
 
@@ -88,11 +89,19 @@ Linux (this fork):
 
 ```bash
 {baseDir}/browser-start-linux.js                       # Agent's own dedicated profile
+{baseDir}/browser-start-linux.js --headless              # No visible window (agents)
 {baseDir}/browser-start-linux.js --profile             # Refresh seeded profiles from a real profile
 {baseDir}/browser-start-linux.js --list-profiles       # List profiles in the agent profile
 {baseDir}/browser-start-linux.js --profile-directory "Profile 1"
 {baseDir}/browser-start-linux.js --class "Pi-Agent"    # Custom window class (Wayland app_id)
 ```
+
+### Headless by default
+
+Agents should pass `--headless` unless a person must see or interact with the
+window. Headless supports navigation, evaluation, screenshots, emulation, and
+logging. Use a visible window for `browser-pick.js`, manual sign-in, or
+debugging a headless-only difference.
 
 Launch Chrome with remote debugging on `:9222`. The Linux script auto-detects
 Chromium (override with `$CHROME_BIN`) and uses a dedicated, persistent
@@ -109,6 +118,18 @@ Inside a read-only `XDG_CONFIG_HOME` (for example the bubblewrap sandbox, where
 directory and dies with `SIGTRAP`. The script then points Chromium's crash dumps
 at `~/.cache/browser-tools-xdg`; the browser profile, passed with
 `--user-data-dir`, is unaffected. See [PATCHES.md](PATCHES.md), Patch 7.
+
+## Stop Chrome
+
+```bash
+{baseDir}/browser-stop.js          # Stop the agent browser on :9222
+{baseDir}/browser-stop.js --all    # Stop every agent browser (any port)
+```
+
+Only Chromium processes that use the agent user-data-dir are stopped; a normal
+browser is left alone. `browser-stop.js` sends `SIGTERM`, so Chromium shuts down
+cleanly and preserves the profile. Use it before switching profiles or resetting
+state.
 
 ### Always use the cached agent profile
 
@@ -182,7 +203,7 @@ runs, so the script refuses if the agent browser is up. Stop just the agent
 instance without matching the invoking shell:
 
 ```bash
-pkill -f "[u]ser-data-dir=$HOME/.cache/browser-tools"
+{baseDir}/browser-stop.js
 ```
 
 ### Reinstalling is one-shot

@@ -3,12 +3,16 @@
 import { spawn, execSync } from "node:child_process";
 import puppeteer from "puppeteer-core";
 
-const useProfile = process.argv[2] === "--profile";
+const args = new Set(process.argv.slice(2));
+const useProfile = args.has("--profile");
+const headless = args.has("--headless");
 
-if (process.argv[2] && process.argv[2] !== "--profile") {
-	console.log("Usage: browser-start.js [--profile]");
+const unknownArgs = [...args].filter((arg) => arg !== "--profile" && arg !== "--headless");
+if (unknownArgs.length > 0) {
+	console.log("Usage: browser-start.js [--headless] [--profile]");
 	console.log("\nOptions:");
-	console.log("  --profile  Copy your default Chrome profile (cookies, logins)");
+	console.log("  --headless  Run Chrome without a visible window (recommended for agents)");
+	console.log("  --profile   Copy your default Chrome profile (cookies, logins)");
 	process.exit(1);
 }
 
@@ -59,6 +63,7 @@ spawn(
 		"--no-first-run",
 		"--no-default-browser-check",
 	],
+		...(headless ? ["--headless=new"] : []),
 	{ detached: true, stdio: "ignore" },
 ).unref();
 
@@ -83,4 +88,4 @@ if (!connected) {
 	process.exit(1);
 }
 
-console.log(`✓ Chrome started on :9222${useProfile ? " with your profile" : ""}`);
+console.log(`✓ Chrome started on :9222${useProfile ? " with your profile" : ""}${headless ? " (headless)" : ""}`);

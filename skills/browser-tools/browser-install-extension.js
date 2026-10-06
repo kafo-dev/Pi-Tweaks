@@ -260,7 +260,7 @@ async function downloadCrx(id) {
 // Chromium's SingletonLock is a symlink to "<hostname>-<pid>" while a browser
 // owns the user-data-dir. Matching argv with pgrep is not an option: a shell
 // that merely mentions --user-data-dir=<agent> would match itself (and be
-// killed by the usual pkill workaround). Resolve the lock and confirm the pid
+// killed by a naive process match). Resolve the lock and confirm the pid
 // really is a browser on this directory instead.
 function chromiumIsRunning() {
 	const lock = join(AGENT_PROFILE, "SingletonLock");
@@ -307,7 +307,7 @@ function forgetExtension(id) {
 if (chromiumIsRunning()) {
 	console.error("✗ Chromium is running with the agent user-data-dir; it would overwrite Preferences.");
 	console.error("  Close it, or stop just the agent instance:");
-	console.error(`    pkill -f '[u]ser-data-dir=${AGENT_PROFILE}'`);
+	console.error("    browser-stop.js   # from this skill directory");
 	process.exit(1);
 }
 

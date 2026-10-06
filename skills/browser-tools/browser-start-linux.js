@@ -12,9 +12,12 @@
 //   - With --profile, refreshes the seeded user profiles from your real Chromium
 //     profile (rsync --delete) while the agent's own dedicated profile is never
 //     touched. Otherwise it uses whatever the agent profile has.
+//   - Runs headless with --headless, and starts browser-watch.js to record
+//     console and network events.
 //
 // Usage:
 //   browser-start-linux.js                       # Agent's own dedicated profile
+//   browser-start-linux.js --headless            # No visible window (recommended for agents)
 //   browser-start-linux.js --profile             # Refresh seeded profiles from yours
 //   browser-start-linux.js --list-profiles       # List profiles inside the agent profile
 //   browser-start-linux.js --profile-directory "Profile 1"
@@ -34,6 +37,7 @@ import puppeteer from "puppeteer-core";
 
 let useProfile = false;
 let listProfiles = false;
+let headless = false;
 
 // Name of the agent's own profile inside the agent user-data-dir. Chosen so it
 // is unlikely to exist in a seeded user profile, so seeding never collides
@@ -49,6 +53,8 @@ for (let i = 0; i < argv.length; i++) {
 	const arg = argv[i];
 	if (arg === "--profile") {
 		useProfile = true;
+	} else if (arg === "--headless") {
+		headless = true;
 	} else if (arg === "--list-profiles") {
 		listProfiles = true;
 	} else if (arg === "--profile-directory") {
@@ -60,11 +66,12 @@ for (let i = 0; i < argv.length; i++) {
 	} else if (arg.startsWith("--class=")) {
 		appClass = arg.slice("--class=".length);
 	} else {
-		console.log("Usage: browser-start-linux.js [--profile] [--profile-directory <name>] [--class <name>] [--list-profiles]");
+		console.log("Usage: browser-start-linux.js [--headless] [--profile] [--profile-directory <name>] [--class <name>] [--list-profiles]");
 		console.log("\nOptions:");
 		console.log("  --profile                    Refresh seeded profiles from your real browser profile (agent's own profile is kept)");
 		console.log("  --profile-directory <name>   Profile inside ~/.cache/browser-tools to open (default: Pi-Coding-Agent-Dedicated-Profile)");
 		console.log("  --class <name>               Linux window class: Wayland app_id / X11 WM_CLASS (default: Pi-Coding-Agent-Control-chromium)");
+		console.log("  --headless                   Run Chromium without a visible window (recommended for agents)");
 		console.log("  --list-profiles              List the profiles available in the agent profile");
 		process.exit(1);
 	}
@@ -312,6 +319,7 @@ const chromeArgs = [
 	"--no-default-browser-check",
 	"--hide-crash-restore-bubble",
 ];
+if (headless) chromeArgs.push("--headless=new");
 // --class sets the Wayland toplevel app_id (and the X11 WM_CLASS). Empty
 // disables it; by default the agent's own class is used so its window is
 // identifiable and grouped apart from a normal Chromium.
@@ -340,7 +348,5 @@ if (!connected) {
 }
 
 console.log(
-	`✓ Chrome started on :9222 using agent profile: ${AGENT_PROFILE} (profile "${profileDir}")${
-		useProfile ? " (refreshed from your profile)" : ""
-	}`,
+	`✓ Chrome started on :9222 using agent profile: ${AGENT_PROFILE} (profile "${profileDir}")${useProfile ? " (refreshed from your profile)" : ""}${headless ? " (headless)" : ""}`,
 );
