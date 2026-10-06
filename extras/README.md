@@ -10,7 +10,8 @@ run with the permissions of the user account. This wrapper binds the whole
 filesystem read-only and re-binds only the project directory, an agent
 scratchpad, and a few state directories read-write, so a session cannot write
 anywhere else under `$HOME`. It writes nothing to stderr on the sandboxed path,
-except when it starts from `$HOME` (see below); every session it starts carries
+except when it starts from `$HOME` (see below) or a session lock fails
+(see [Session locks](#session-locks)); every session it starts carries
 the system-prompt note described under
 [Sandbox notice](#sandbox-notice).
 
@@ -53,8 +54,9 @@ last written.
 
 `extras/pi-session-pick.mjs` writes the lock. Locks of processes that have
 exited are removed the next time the locks are read, so they do not accumulate.
-Node must be on `PATH`; without it the wrapper starts no lock. A management
-subcommand (`install`, `remove`, `uninstall`, `update`,
+Node must be on `PATH`; without it the wrapper starts no lock. A `node` that is
+present but cannot run, and a picker that exits non-zero, are reported on
+stderr. A management subcommand (`install`, `remove`, `uninstall`, `update`,
 `list`, `config`, `auth`) starts no session and is not locked.
 
 ### What is writable
