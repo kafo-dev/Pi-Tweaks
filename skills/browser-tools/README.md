@@ -53,6 +53,10 @@ See [PATCHES.md](PATCHES.md) for details. In short:
 10. **Cookie-consent dismissal** —
     [`browser-dismiss-cookies.js`](browser-dismiss-cookies.js) accepts or
     rejects common consent dialogs.
+11. **Console and network logging** —
+    [`browser-watch.js`](browser-watch.js) records to JSONL, with
+    [`browser-logs-tail.js`](browser-logs-tail.js) and
+    [`browser-net-summary.js`](browser-net-summary.js) to read it.
 ## Install into pi
 
 This directory is the skill declared by the Pi-Tweaks pi package. Install the
@@ -98,6 +102,8 @@ npm install          # scripts use puppeteer-core + the system browser
 ./browser-content.js https://example.com
 ./browser-pick.js "Click the submit button"
 ./browser-hn-scraper.js
+./browser-logs-tail.js [--follow]
+./browser-net-summary.js
 ```
 
 See [`SKILL.md`](SKILL.md) for the full reference and output discipline.

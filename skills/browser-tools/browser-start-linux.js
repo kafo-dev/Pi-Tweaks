@@ -347,6 +347,12 @@ if (!connected) {
 	process.exit(1);
 }
 
+// Record console and network events for the running browser.
+spawn(process.execPath, [join(import.meta.dirname, "browser-watch.js")], {
+	detached: true,
+	stdio: "ignore",
+}).unref();
+
 console.log(
 	`✓ Chrome started on :9222 using agent profile: ${AGENT_PROFILE} (profile "${profileDir}")${useProfile ? " (refreshed from your profile)" : ""}${headless ? " (headless)" : ""}`,
 );

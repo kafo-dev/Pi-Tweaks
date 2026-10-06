@@ -168,7 +168,9 @@ change.
 [`browser-start-linux.js`](browser-start-linux.js),
 [`browser-stop.js`](browser-stop.js) (added)
 
-Both start scripts accept `--headless` (Chromium `--headless=new`).
+Both start scripts accept `--headless` (Chromium `--headless=new`), and the
+Linux script starts [`browser-watch.js`](browser-watch.js) after the browser is
+up.
 
 `browser-stop.js` stops the agent browser without matching the invoking shell:
 it reads `ps -eo pid=,command=`, keeps processes whose argv carries
@@ -207,3 +209,18 @@ Usercentrics, TrustArc, Klaro, BBC, Amazon, CookieYes), falls back to generic
 consent containers and button text, and scans consent iframes when the top
 document has no dialog.
 
+## Patch 11 — Console and network logging
+
+**Files:** [`browser-watch.js`](browser-watch.js),
+[`browser-logs-tail.js`](browser-logs-tail.js),
+[`browser-net-summary.js`](browser-net-summary.js) (added)
+
+`browser-watch.js` attaches a CDP session to every page and records
+`Runtime.consoleAPICalled`, `Runtime.exceptionThrown`, `Log.entryAdded`,
+`Network.requestWillBeSent`, `Network.responseReceived`, and
+`Network.loadingFailed` as JSONL under
+`~/.cache/browser-tools/logs/YYYY-MM-DD/`. The start scripts launch it, and a
+pid file keeps it single-instance. `browser-logs-tail.js` prints the newest log
+(with `--follow`), and `browser-net-summary.js` prints status counts, top
+hosts, and non-OK or failed responses. The watcher uses puppeteer sessions
+rather than a separate `ws` CDP client, so no dependency is added.

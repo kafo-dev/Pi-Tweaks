@@ -6,6 +6,12 @@ This directory contains code derived from **pi-skills** by Mario Zechner.
 - Upstream path: `browser-tools/`
 - Forked at commit: `90bb51cae36515a648515b633a81c0c6efc8c74d` (2026-06-06)
 
+Parts of the device emulation, cookie dismissal, browser stop, and console/network
+logging tools are adapted from **agent-stuff** by Mario Zechner:
+
+- Upstream: https://github.com/mitsuhiko/agent-stuff
+- Upstream path: `skills/web-browser/`
+
 ## License
 
 Everything in `browser-tools/` is licensed under the **MIT License** — see
@@ -21,19 +27,22 @@ here are likewise MIT. Per-file origin:
 
 | File | Origin |
 |------|--------|
-| `browser-start.js` | upstream |
-| `browser-nav.js` | upstream |
-| `browser-eval.js` | upstream |
-| `browser-screenshot.js` | upstream |
-| `browser-pick.js` | upstream |
-| `browser-cookies.js` | upstream |
-| `browser-content.js` | upstream |
+| `browser-start.js` | upstream, modified by Pi-Tweaks (headless, watcher) |
+| `browser-nav.js` | upstream, modified by Pi-Tweaks (active emulation) |
+| `browser-eval.js` | upstream, modified by Pi-Tweaks (active emulation) |
+| `browser-screenshot.js` | upstream, modified by Pi-Tweaks (`--full-page`, `--device`, active emulation) |
+| `browser-pick.js` | upstream, modified by Pi-Tweaks (active emulation) |
+| `browser-cookies.js` | upstream, modified by Pi-Tweaks (active emulation) |
+| `browser-content.js` | upstream, modified by Pi-Tweaks (active emulation) |
 | `browser-hn-scraper.js` | upstream |
+| `browser-start-linux.js` | added by Pi-Tweaks |
+| `browser-devices.js`, `browser-emulation.js`, `browser-emulate.js` | added by Pi-Tweaks, adapted from `mitsuhiko/agent-stuff` (MIT) |
+| `browser-dismiss-cookies.js` | added by Pi-Tweaks, adapted from `mitsuhiko/agent-stuff` (MIT) |
+| `browser-watch.js`, `browser-logs-tail.js`, `browser-net-summary.js` | added by Pi-Tweaks, adapted from `mitsuhiko/agent-stuff` (MIT) |
+| `browser-stop.js` | added by Pi-Tweaks, adapted from `mitsuhiko/agent-stuff` (MIT) |
 | `LICENSE` | upstream MIT text, copyright line added for Pi-Tweaks |
 | `SKILL.md` | upstream, modified by Pi-Tweaks |
-| `browser-start-linux.js` | added by Pi-Tweaks |
 | `README.md`, `NOTICE.md`, `PATCHES.md` | added by Pi-Tweaks |
-
 Dependency declarations for this skill live in the repository root
 [`../../package.json`](../../package.json) (added by Pi-Tweaks); the upstream nested
 `package.json`/`package-lock.json` were removed when the repo became a pi

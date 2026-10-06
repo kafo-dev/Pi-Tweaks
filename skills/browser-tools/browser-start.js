@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn, execSync } from "node:child_process";
+import { join } from "node:path";
 import puppeteer from "puppeteer-core";
 
 const args = new Set(process.argv.slice(2));
@@ -87,5 +88,11 @@ if (!connected) {
 	console.error("✗ Failed to connect to Chrome");
 	process.exit(1);
 }
+
+// Record console and network events for the running browser.
+spawn(process.execPath, [join(import.meta.dirname, "browser-watch.js")], {
+	detached: true,
+	stdio: "ignore",
+}).unref();
 
 console.log(`✓ Chrome started on :9222${useProfile ? " with your profile" : ""}${headless ? " (headless)" : ""}`);

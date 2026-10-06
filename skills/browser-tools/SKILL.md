@@ -322,6 +322,21 @@ containers and button text, and scans consent iframes.
 
 Navigate to a URL and extract readable content as markdown. Uses Mozilla Readability for article extraction and Turndown for HTML-to-markdown conversion. Works on pages with JavaScript content (waits for page to load).
 
+
+## Console and Network Logging
+
+The start scripts launch `browser-watch.js`, which records console messages,
+exceptions, browser log entries, and network requests, responses, and failures
+as JSONL under `~/.cache/browser-tools/logs/YYYY-MM-DD/`.
+
+```bash
+{baseDir}/browser-logs-tail.js            # print the newest log and exit
+{baseDir}/browser-logs-tail.js --follow   # keep following
+{baseDir}/browser-net-summary.js          # status counts, top hosts, failures
+```
+
+Redirect the tail output to a file and query it when it grows large.
+
 ## When to Use
 
 - Testing frontend code in a real browser
