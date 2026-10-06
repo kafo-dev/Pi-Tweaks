@@ -191,9 +191,19 @@ with `--all`. The skill no longer needs the `pkill` recipe.
 rejects the partial `userAgentMetadata` that a platform-only override produces.
 
 `browser-nav.js`, `browser-eval.js`, `browser-screenshot.js`,
-`browser-pick.js`, `browser-cookies.js`, and `browser-content.js` re-apply the
-stored preference on each run, so a `--new` tab or a reload keeps the emulated
-device. `browser-screenshot.js` also gains `--full-page` and
-`--device <preset> [--landscape]`; a `--device` override applies to that
-screenshot only.
+`browser-pick.js`, `browser-cookies.js`, `browser-content.js`, and
+`browser-dismiss-cookies.js` re-apply the stored preference on each run, so a
+`--new` tab or a reload keeps the emulated device. `browser-screenshot.js` also
+gains `--full-page` and `--device <preset> [--landscape]`; a `--device`
+override applies to that screenshot only.
+
+## Patch 10 — Cookie-consent dismissal
+
+**File:** [`browser-dismiss-cookies.js`](browser-dismiss-cookies.js) (added)
+
+Accepts (default) or rejects (`--reject`) EU cookie-consent dialogs. It handles
+the common CMPs (OneTrust, Google, YouTube, Cookiebot, Didomi, Quantcast,
+Usercentrics, TrustArc, Klaro, BBC, Amazon, CookieYes), falls back to generic
+consent containers and button text, and scans consent iframes when the top
+document has no dialog.
 

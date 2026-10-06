@@ -50,6 +50,9 @@ See [PATCHES.md](PATCHES.md) for details. In short:
    persistent mobile preset applied by the other tools;
    [`browser-screenshot.js`](browser-screenshot.js) gains `--full-page` and
    `--device`.
+10. **Cookie-consent dismissal** —
+    [`browser-dismiss-cookies.js`](browser-dismiss-cookies.js) accepts or
+    rejects common consent dialogs.
 ## Install into pi
 
 This directory is the skill declared by the Pi-Tweaks pi package. Install the
@@ -90,6 +93,7 @@ npm install          # scripts use puppeteer-core + the system browser
 ./browser-emulate.js --list
 ./browser-emulate.js iphone-14 [--landscape]
 ./browser-emulate.js --reset
+./browser-dismiss-cookies.js [--reject]
 ./browser-cookies.js
 ./browser-content.js https://example.com
 ./browser-pick.js "Click the submit button"

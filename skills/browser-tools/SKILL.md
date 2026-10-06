@@ -245,8 +245,9 @@ The script uses Chromium's `external_crx` mechanism rather than
 Set a persistent mobile emulation (viewport, device pixel ratio, touch, user
 agent) for the active tab. Presets: `iphone-se`, `iphone-14`, `pixel-7`,
 `galaxy-s20`. `browser-nav.js`, `browser-eval.js`, `browser-screenshot.js`,
-`browser-pick.js`, `browser-cookies.js`, and `browser-content.js` re-apply the
-preference, so a reload or a `--new` tab keeps the device. `--reset` clears it.
+`browser-pick.js`, `browser-cookies.js`, `browser-content.js`, and
+`browser-dismiss-cookies.js` re-apply the preference, so a reload or a `--new`
+tab keeps the device. `--reset` clears it.
 
 ## Navigate
 
@@ -299,6 +300,19 @@ Common use cases:
 ```
 
 Display all cookies for the current tab including domain, path, httpOnly, and secure flags. Use this to debug authentication issues or inspect session state.
+
+
+## Dismiss Cookie Dialogs
+
+```bash
+{baseDir}/browser-dismiss-cookies.js          # Accept cookies
+{baseDir}/browser-dismiss-cookies.js --reject # Reject cookies (where possible)
+```
+
+Run after navigating to a page. The script handles the common consent managers
+(OneTrust, Google, YouTube, Cookiebot, Didomi, Quantcast, Usercentrics,
+TrustArc, Klaro, BBC, Amazon, CookieYes), falls back to generic consent
+containers and button text, and scans consent iframes.
 
 ## Extract Page Content
 
