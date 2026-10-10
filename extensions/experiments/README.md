@@ -101,16 +101,14 @@ listed once, in the markdown tab.
 ## `prune-sessions.ts`
 
 Hypothesis: an unnamed session that has seen no use for three months is dead
-weight, while a named session is worth keeping forever, and neither should be
-deleted when another pi still has it open.
+weight, while a named session is worth keeping forever. An open session keeps a
+fresh mtime while it is used, so it does not age out.
 
-A session file is moved to the XDG trash when all three hold:
+A session file is moved to the XDG trash when both hold:
 
 - the file mtime is older than `olderThanDays` (default 90). The mtime is the
   last append, so it is the last use, not the creation date.
 - the session carries no name from `/name` or `--name`.
-- no live pi process holds it, by the locks written by the sandbox wrapper
-  (`extras/pi-session-pick.mjs`, see [extras](../../extras/README.md)).
 
 ```json
 {
@@ -127,9 +125,9 @@ With `disableAutoPruning` false, a round runs in the background five seconds
 after startup, at most once per `pruneIntervalHours`; it streams the session
 files, so a slow filesystem delays the round rather than the agent.
 `/pi-tweaks prune-sessions` runs a round on demand, and `--dry-run` reports
-without moving anything. The time of the last automatic round is kept beside
-the session locks, in the Pi-Tweaks cache directory: runtime state belongs in
-the cache, not in the agent directory that holds configuration.
+without moving anything. The time of the last automatic round is kept in the
+Pi-Tweaks cache directory: runtime state belongs in the cache, not in the agent
+directory that holds configuration.
 
 The XDG trash lives at `$XDG_DATA_HOME/Trash` (default
 `~/.local/share/Trash`). The sandbox wrapper binds it read-write, so a move

@@ -1,15 +1,13 @@
 /**
  * prune-sessions — move old, unnamed, unused sessions to the trash.
  *
- * A session is removed from the session store when all of these hold:
+ * A session is removed from the session store when both of these hold:
  *
  *   - it was last written more than `olderThanDays` ago (default 90, about
  *     three months); the file mtime is the last time pi appended an entry, so
  *     it is the last use, not the creation time
  *   - it has no name; a session named with `/name` (or `--name`) is kept
  *     forever
- *   - no live pi process holds it, according to the locks written by the
- *     sandbox wrapper (see lib/session-store.mjs)
  *
  * The file is moved to the XDG trash, not deleted. `gio trash` is not used:
  * the XDG trash spec is small enough to write directly, and this keeps the
@@ -65,12 +63,7 @@ import {
 	numberValue,
 	readSection,
 } from "../../lib/pi-tweaks-config";
-import {
-	isAttributed,
-	readLiveLocks,
-	readSessionCwd,
-	readSessionName,
-} from "../../lib/session-store.mjs";
+import { readSessionName } from "../../lib/session-store.mjs";
 
 const EXTENSION = "experiment-prune-sessions";
 
@@ -94,7 +87,7 @@ type RoundResult = {
 	trashed: string[];
 	/** Files kept because they carry a name. */
 	named: number;
-	/** Files kept because a live process may be using them. */
+	/** Files kept because they are the session this round runs in. */
 	active: number;
 	/** Problems that stopped a file from being moved. */
 	errors: string[];
@@ -208,9 +201,6 @@ type RoundOptions = {
 async function runRound(options: RoundOptions): Promise<RoundResult> {
 	const { agentDir, olderThanDays, dryRun, currentSessionFile } = options;
 	const cutoff = Date.now() - olderThanDays * DAY_MS;
-	// Inside the sandbox the host pid of another pi cannot be checked, so
-	// every lock counts as live; the wrapper clears stale locks on the host.
-	const locks = readLiveLocks({ assumeLive: true });
 	const result: RoundResult = {
 		scanned: 0,
 		candidates: 0,
@@ -237,11 +227,6 @@ async function runRound(options: RoundOptions): Promise<RoundResult> {
 		}
 		if (await readSessionName(path)) {
 			result.named += 1;
-			continue;
-		}
-		const cwd = readSessionCwd(path);
-		if (isAttributed(path, mtimeMs, locks, cwd)) {
-			result.active += 1;
 			continue;
 		}
 
