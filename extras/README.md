@@ -71,7 +71,7 @@ stderr. A management subcommand (`install`, `remove`, `uninstall`, `update`,
 | `~/.agents` | global skills (`~/.agents/skills`) |
 
 Everything else is read-only. Language and package-manager directories are
-deliberately not bound: add the ones a session needs to the `rw-paths.txt` file
+deliberately not bound: add the ones a session needs to the `wrapper-config.txt` file
 (see below).
 
 The agent directory is shared read-write with the host, so auth, sessions, and
@@ -95,7 +95,7 @@ prevent that, the wrapper appends a note to the system prompt of every session
 it starts. The note names the sandbox rather than the mounts, which the user
 can change between runs, and states what to do on a permission or
 read-only-filesystem error — report it and ask the user to lift the restriction
-on that path, either by listing it in `rw-paths.txt` or by restarting with
+on that path, either by listing it in `wrapper-config.txt` or by restarting with
 `BWRAP=0`.
 
 A second part of the note covers scratch files. `/tmp` is a private tmpfs that
@@ -115,19 +115,24 @@ A management subcommand starts no session and gets no note.
 The agent gets a scratchpad beside the agent directory, at `~/.pi/scratchpad`
 with the default agent directory, and bound read-write on every run. It is the
 designated place for temporary files when the project directory is read-only.
-Like `rw-paths.txt`, the path follows the parent of `PI_CODING_AGENT_DIR`, so
+Like `wrapper-config.txt`, the path follows the parent of `PI_CODING_AGENT_DIR`, so
 moving the agent directory moves the scratchpad with it.
 
 Concurrent agents share the scratchpad, and it outlives a session, so the
 sandbox notice tells each one to work inside a subdirectory of its own (see
 [Sandbox notice](#sandbox-notice)).
 
-### Extra read-write paths
+### Extra paths
 
-List additional host paths to bind read-write, one per line, in a file next to
-the agent directory. With the default agent directory that is
-`~/.pi/rw-paths.txt`; overriding `PI_CODING_AGENT_DIR` moves the file to its
-parent directory:
+List additional host paths in one file next to the agent directory. With the
+default agent directory that is `~/.pi/wrapper-config.txt`; overriding
+`PI_CODING_AGENT_DIR` moves the file to its parent directory. This is the
+wrapper's only config file: it holds the `hide-home` setting as well.
+
+The separate `rw-paths.txt` file is no longer read: move its paths into this
+file.
+
+One host path per line:
 
 ```
 # comments and blank lines are ignored
@@ -139,15 +144,15 @@ parent directory:
 does not exist is skipped and the wrapper still starts. A device node, and any
 path under `/dev`, is mounted with `--dev-bind-try` instead: the sandbox mounts
 a fresh tmpfs over `/dev`, and `--bind` sets `nodev` on the mount, which makes
-the device nodes under it deny access. An entry is taken literally: do not quote
-it, even when the path contains spaces. Non-absolute entries are ignored with a
+the device nodes under it deny access. A path is taken literally: do not quote
+it, even when it contains spaces. Non-absolute entries are ignored with a
 warning. The wrapper reads the file on the host before entering the sandbox,
 and mounts the file itself read-only, after every configured bind. The agent can
-read the list it is told to ask the user to extend, and neither the file nor
-`wrapper-config.txt` becomes writable when a listed directory holds it. Every
-listed path becomes writable by the agent, so list only paths the agent may
-modify; listing `/` or `$HOME` defeats the sandbox. A single file works as well
-as a directory, for example a notes file the agent maintains.
+read the list it is told to ask the user to extend, and a listed directory that
+holds the file cannot make it writable. Every listed path becomes writable by
+the agent, so list only paths the agent may modify; listing `/` or `$HOME`
+defeats the sandbox. A single file works as well as a directory, for example a
+notes file the agent maintains.
 
 ### Hidden home
 
@@ -166,8 +171,8 @@ Under `$HOME` the agent then sees only:
 
 - the agent directory, the cache directory, the skills tree (`.agents`), the
   scratchpad, and the XDG trash, which the wrapper mounts on every run;
-- `rw-paths.txt` and `wrapper-config.txt`, read-only;
-- every path listed in `rw-paths.txt`;
+- `wrapper-config.txt`, read-only;
+- every path listed in it;
 - the working directory, when the wrapper mounts it read-write.
 
 Everything else is gone rather than read-only. A directory that is not listed
@@ -178,14 +183,14 @@ disappear when the session ends.
 
 Tools that keep their state under `$HOME` lose it too. `~/.ssh`, `~/.gitconfig`,
 `~/.config/git`, and `~/.gnupg` are not mounted, so a `git` command that needs
-one of them fails until the path is listed in `rw-paths.txt`.
+one of them fails until the path is listed in `wrapper-config.txt`.
 
 ### Environment variables
 
 | Variable | Purpose |
 |----------|---------|
 | `BWRAP` | Set to `0` to skip the sandbox. The wrapper then warns and runs `pi` unsandboxed with the same arguments. |
-| `PI_CODING_AGENT_DIR` | Override the agent directory that is bound read-write. Default `~/.pi/agent`. The scratchpad, `rw-paths.txt`, and `wrapper-config.txt` move to its parent. |
+| `PI_CODING_AGENT_DIR` | Override the agent directory that is bound read-write. Default `~/.pi/agent`. The scratchpad and `wrapper-config.txt` move to its parent. |
 | `XDG_CACHE_HOME` | Override the cache directory that is bound read-write. Default `~/.cache`. Pi-Tweaks keeps its runtime state in `<cacheDir>/pi-tweaks`: the session locks and the time of the last automatic prune round. |
 | `XDG_DATA_HOME` | Override the data directory whose `Trash` is bound read-write. Default `~/.local/share`. |
 

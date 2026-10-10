@@ -7,7 +7,7 @@
 # the project directory, a scratchpad, and a few state directories read-write,
 # so a session cannot write anywhere else under $HOME. Started from $HOME (or
 # an ancestor), the project directory stays read-only and the agent is pointed
-# at the scratchpad instead. The wrapper's own config files are mounted
+# at the scratchpad instead. The wrapper's own config file is mounted
 # read-only, whatever else is writable. A `hide-home` line in the wrapper
 # config hides the rest of the home directory: it becomes an empty read-only
 # directory holding only the paths this wrapper mounts.
@@ -73,28 +73,53 @@ pi_dir="${agent_dir%/*}"
 
 # Agent scratchpad, bound read-write on every run and the fallback when the
 # project directory is $HOME. It sits beside the agent directory (default
-# "$HOME/.pi/scratchpad"), so it follows PI_CODING_AGENT_DIR like rw-paths.txt.
+# "$HOME/.pi/scratchpad"), so it follows PI_CODING_AGENT_DIR like the config.
 scratch_dir="$pi_dir/scratchpad"
 
 cwd=$(pwd -P)
 home_real=$(cd "$HOME" && pwd -P)
 
-# Wrapper config: one setting per line, read from a file beside the agent
-# directory (default "$HOME/.pi/wrapper-config.txt"). Blank lines and lines
-# starting with '#' are ignored. A line containing the word "hide-home"
-# hides the home directory. Every other line is ignored. See extras/README.md.
+# Trim leading and trailing blanks from its argument.
+trim() {
+	printf '%s\n' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+}
+
+# Normalize a configured path: expand a leading '~', reject a non-absolute
+# path with a warning. Sets $path and returns non-zero when unusable.
+resolve_path() {
+	path=$1
+	# The tilde in the "~/" pattern is a literal case pattern, not a shell
+	# expansion, so shellcheck's SC2088 does not apply.
+	# shellcheck disable=SC2088
+	case "$path" in
+	"~") path=$HOME ;;
+	"~/"*) path="$HOME${path#?}" ;;
+	esac
+	case "$path" in
+	/*) ;;
+	*)
+		echo "pi-wrapper: ignoring non-absolute path in $config_file: $path" >&2
+		return 1
+		;;
+	esac
+	return 0
+}
+
+# Wrapper config: one file beside the agent directory (default
+# "$HOME/.pi/wrapper-config.txt"). Blank lines and lines starting with '#' are
+# ignored. A "hide-home" line hides the home directory; every other line names
+# a host path to bind read-write, so an old rw-paths.txt moves over as is. See
+# extras/README.md.
 hide_home=0
-wrapper_config="$pi_dir/wrapper-config.txt"
-if [ -f "$wrapper_config" ]; then
+config_file="$pi_dir/wrapper-config.txt"
+if [ -f "$config_file" ]; then
 	while IFS= read -r line || [ -n "$line" ]; do
-		line=$(printf '%s\n' "$line" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+		line=$(trim "$line")
 		case "$line" in
 		"" | '#'*) continue ;;
+		hide-home | hide-home[[:space:]]*) hide_home=1 ;;
 		esac
-		case "$line" in
-		*hide-home*) hide_home=1 ;;
-		esac
-	done <"$wrapper_config"
+	done <"$config_file"
 fi
 
 # A management subcommand starts no agent session.
@@ -175,14 +200,11 @@ for d in "$agent_dir" "$cache_dir" "$agents_dir" "$scratch_dir" "$trash_dir"; do
 	mkdir -p "$d"
 done
 
-# Extra read-write paths, one per line, next to the agent directory (default
-# "$HOME/.pi/rw-paths.txt"). Blank lines and lines starting with '#' are
-# ignored, '~' expands to $HOME, and a missing path is skipped (--bind-try).
-# A device node, or any path under /dev, is mounted with --dev-bind-try
-# instead, since --bind marks the mount nodev and blocks the device.
-# The file is read here, on the host, so it need not be reachable inside the
-# sandbox.
-rw_file="$pi_dir/rw-paths.txt"
+# Extra read-write paths from the wrapper config, one per line: '~' expands to
+# $HOME, and a missing path is skipped (--bind-try). A device node, or any path
+# under /dev, is mounted with --dev-bind-try instead, since --bind marks the
+# mount nodev and blocks the device. The file is read here, on the host, so it
+# need not be reachable inside the sandbox.
 
 # The agent cannot see the sandbox from inside, so it is told about it. Without
 # this note a permission error reads as a broken environment, and the agent
@@ -190,7 +212,7 @@ rw_file="$pi_dir/rw-paths.txt"
 # stays out of the note, because the user can change it between runs. Pi takes
 # the note as inline text (--append-system-prompt), so nothing has to be
 # written to disk.
-sandbox_note="This session runs inside a bubblewrap sandbox. A write that fails with a permission or read-only-filesystem error is being blocked by the sandbox: do not try to work around the mount. Ask the user to lift the restriction on that path. On the host they can list it in $rw_file (one absolute path per line) and restart pi, or restart pi with BWRAP=0 to run without the sandbox."
+sandbox_note="This session runs inside a bubblewrap sandbox. A write that fails with a permission or read-only-filesystem error is being blocked by the sandbox: do not try to work around the mount. Ask the user to lift the restriction on that path. On the host they can add the path to $config_file and restart pi, or restart pi with BWRAP=0 to run without the sandbox."
 
 # /tmp is a private tmpfs that dies with the sandbox, and the scratchpad is
 # shared with every other agent that is running, so both need a rule.
@@ -232,40 +254,23 @@ if [ "$hide_home" = 1 ]; then
 	set -- --remount-ro "$HOME" "$@"
 fi
 
-# The wrapper's own two files are mounted read-only. Prepending here puts both
-# after every configured bind, so a listed directory that holds one of them
-# cannot make it writable, and the agent can still read the file the sandbox
-# notice tells it to ask the user to extend. `--ro-bind` rather than
-# `--ro-bind-try`: a bind that fails has to stop the run, not leave the file
-# writable. A file that does not exist is skipped, which is the common case for
-# the wrapper config.
-if [ -f "$rw_file" ]; then
-	set -- --ro-bind "$rw_file" "$rw_file" "$@"
-fi
-if [ -f "$wrapper_config" ]; then
-	set -- --ro-bind "$wrapper_config" "$wrapper_config" "$@"
+# The wrapper's own config file is mounted read-only. Prepending here puts it
+# after every configured bind, so a listed directory that holds it cannot make
+# it writable, and the agent can still read the file the sandbox notice tells
+# it to ask the user to extend. `--ro-bind` rather than `--ro-bind-try`: a bind
+# that fails has to stop the run, not leave the file writable. A file that does
+# not exist is skipped, which is the common case before the user creates it.
+if [ -f "$config_file" ]; then
+	set -- --ro-bind "$config_file" "$config_file" "$@"
 fi
 
-if [ -f "$rw_file" ]; then
-	while IFS= read -r path || [ -n "$path" ]; do
-		path=$(printf '%s\n' "$path" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
-		case "$path" in
-		"" | '#'*) continue ;;
+if [ -f "$config_file" ]; then
+	while IFS= read -r line || [ -n "$line" ]; do
+		line=$(trim "$line")
+		case "$line" in
+		"" | '#'* | hide-home*) continue ;;
 		esac
-		# The tilde in the "~/" pattern is a literal case pattern, not a
-		# shell expansion, so shellcheck's SC2088 does not apply.
-		# shellcheck disable=SC2088
-		case "$path" in
-		"~") path=$HOME ;;
-		"~/"*) path="$HOME${path#?}" ;;
-		esac
-		case "$path" in
-		/*) ;;
-		*)
-			echo "pi-wrapper: ignoring non-absolute path in $rw_file: $path" >&2
-			continue
-			;;
-		esac
+		resolve_path "$line" || continue
 		# A device node needs a device bind: --bind mounts with nodev
 		# set, which denies access to the nodes under it. Anything
 		# under /dev counts, because the sandbox replaces /dev with a
@@ -281,7 +286,7 @@ if [ -f "$rw_file" ]; then
 			;;
 		esac
 		set -- "$bind_opt" "$path" "$path" "$@"
-	done <"$rw_file"
+	done <"$config_file"
 fi
 
 # The project directory is read-write only when it does not expose $HOME.
@@ -299,7 +304,7 @@ set -- \
 
 # hide-home: an empty home directory. Everything under $HOME disappears, and
 # the mounts after this put back the paths this wrapper uses: the state
-# directories bound just above, every rw-paths entry, and the working
+# directories bound just above, every configured path, and the working
 # directory. The tmpfs has to follow `--ro-bind / /` and precede those
 # mounts, or a later mount covers it or it covers them.
 if [ "$hide_home" = 1 ]; then

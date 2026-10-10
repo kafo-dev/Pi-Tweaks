@@ -158,9 +158,9 @@ created on demand. `--user-data-dir` is passed explicitly, so the browser
 profile is unaffected and only crash reports move. A writable
 `XDG_CONFIG_HOME` is used unchanged.
 
-The alternative fix, listing `~/.config/chromium` in `~/.pi/rw-paths.txt`, fixes
-every Chromium launch in the sandbox but is a host change, not a repository
-change.
+The alternative fix, listing `~/.config/chromium` in `~/.pi/wrapper-config.txt`,
+fixes every Chromium launch in the sandbox but is a host change, not a
+repository change.
 
 ## Patch 8 — Headless launch and `browser-stop.js`
 
