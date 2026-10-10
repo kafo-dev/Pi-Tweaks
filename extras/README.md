@@ -71,8 +71,8 @@ stderr. A management subcommand (`install`, `remove`, `uninstall`, `update`,
 | `~/.agents` | global skills (`~/.agents/skills`) |
 
 Everything else is read-only. Language and package-manager directories are
-deliberately not bound: add the ones a session needs to the `wrapper-config.txt` file
-(see below).
+deliberately not bound: add the ones a session needs to the `wrapper-config.txt`
+file (see below).
 
 The agent directory is shared read-write with the host, so auth, sessions, and
 installed packages carry over between sandboxed and unsandboxed runs. That also
@@ -115,8 +115,9 @@ A management subcommand starts no session and gets no note.
 The agent gets a scratchpad beside the agent directory, at `~/.pi/scratchpad`
 with the default agent directory, and bound read-write on every run. It is the
 designated place for temporary files when the project directory is read-only.
-Like `wrapper-config.txt`, the path follows the parent of `PI_CODING_AGENT_DIR`, so
-moving the agent directory moves the scratchpad with it.
+Like `wrapper-config.txt`, the path follows the parent of
+`PI_CODING_AGENT_DIR`, so moving the agent directory moves the scratchpad with
+it.
 
 Concurrent agents share the scratchpad, and it outlives a session, so the
 sandbox notice tells each one to work inside a subdirectory of its own (see
@@ -132,27 +133,40 @@ wrapper's only config file: it holds the `hide-home` setting as well.
 The separate `rw-paths.txt` file is no longer read: move its paths into this
 file.
 
-One host path per line:
+Each line is a directive:
 
 ```
 # comments and blank lines are ignored
-~/Documents
-/home/user/shared
+rw ~/Documents
+rw /home/user/shared
+ro ~/.ssh
+ro /home/user/.config/git
 ```
 
-`~` expands to `$HOME`. Each entry is mounted with `--bind-try`, so a path that
-does not exist is skipped and the wrapper still starts. A device node, and any
-path under `/dev`, is mounted with `--dev-bind-try` instead: the sandbox mounts
-a fresh tmpfs over `/dev`, and `--bind` sets `nodev` on the mount, which makes
-the device nodes under it deny access. A path is taken literally: do not quote
-it, even when it contains spaces. Non-absolute entries are ignored with a
-warning. The wrapper reads the file on the host before entering the sandbox,
-and mounts the file itself read-only, after every configured bind. The agent can
-read the list it is told to ask the user to extend, and a listed directory that
-holds the file cannot make it writable. Every listed path becomes writable by
-the agent, so list only paths the agent may modify; listing `/` or `$HOME`
-defeats the sandbox. A single file works as well as a directory, for example a
-notes file the agent maintains.
+`rw <path>` binds the path read-write, `ro <path>` read-only, and a bare path
+counts as `rw`. `~` expands to `$HOME`. Read-write entries mount with
+`--bind-try` and read-only entries with `--ro-bind-try`, so a path that does not
+exist is skipped and the wrapper still starts. Read-only entries mount after
+read-write ones, so a path listed both ways ends up read-only.
+
+A read-write device node, and any read-write path under `/dev`, is mounted with
+`--dev-bind-try` instead: the sandbox mounts a fresh tmpfs over `/dev`, and
+`--bind` sets `nodev` on the mount, which makes the device nodes under it deny
+access. A read-only entry always uses `--ro-bind-try`, `nodev` included, so list
+a device node under `rw` to keep it usable.
+
+A path is taken literally: do not quote it, even when it contains spaces.
+Non-absolute entries are ignored with a warning. The wrapper reads the file on
+the host before entering the sandbox, and mounts the file itself read-only,
+after every configured bind. The agent can read the list it is told to ask the
+user to extend, and a listed directory that holds the file cannot make it
+writable. Every read-write path becomes writable by the agent, so list only
+paths the agent may modify; listing `/` or `$HOME` defeats the sandbox. A single
+file works as well as a directory, for example a notes file the agent maintains.
+
+Read-only entries matter mainly under `hide-home`: without it the whole
+filesystem is already read-only, and an `ro` entry only guarantees that a path
+stays read-only when an ancestor is listed with `rw`.
 
 ### Hidden home
 
@@ -172,7 +186,7 @@ Under `$HOME` the agent then sees only:
 - the agent directory, the cache directory, the skills tree (`.agents`), the
   scratchpad, and the XDG trash, which the wrapper mounts on every run;
 - `wrapper-config.txt`, read-only;
-- every path listed in it;
+- every `rw` path, read-write, and every `ro` path, read-only;
 - the working directory, when the wrapper mounts it read-write.
 
 Everything else is gone rather than read-only. A directory that is not listed
@@ -183,7 +197,7 @@ disappear when the session ends.
 
 Tools that keep their state under `$HOME` lose it too. `~/.ssh`, `~/.gitconfig`,
 `~/.config/git`, and `~/.gnupg` are not mounted, so a `git` command that needs
-one of them fails until the path is listed in `wrapper-config.txt`.
+one of them fails until the path is listed with `rw` in `wrapper-config.txt`.
 
 ### Environment variables
 

@@ -107,9 +107,9 @@ resolve_path() {
 
 # Wrapper config: one file beside the agent directory (default
 # "$HOME/.pi/wrapper-config.txt"). Blank lines and lines starting with '#' are
-# ignored. A "hide-home" line hides the home directory; every other line names
-# a host path to bind read-write, so an old rw-paths.txt moves over as is. See
-# extras/README.md.
+# ignored. A "hide-home" line hides the home directory; "rw <path>" and
+# "ro <path>" bind a path read-write or read-only, and a bare path counts as
+# read-write. See extras/README.md.
 hide_home=0
 config_file="$pi_dir/wrapper-config.txt"
 if [ -f "$config_file" ]; then
@@ -200,11 +200,14 @@ for d in "$agent_dir" "$cache_dir" "$agents_dir" "$scratch_dir" "$trash_dir"; do
 	mkdir -p "$d"
 done
 
-# Extra read-write paths from the wrapper config, one per line: '~' expands to
-# $HOME, and a missing path is skipped (--bind-try). A device node, or any path
-# under /dev, is mounted with --dev-bind-try instead, since --bind marks the
-# mount nodev and blocks the device. The file is read here, on the host, so it
-# need not be reachable inside the sandbox.
+# Extra paths from the wrapper config: "rw <path>" binds a path read-write,
+# "ro <path>" read-only, and a bare path counts as read-write. '~' expands to
+# $HOME, and a missing path is skipped (--bind-try). A read-write device node,
+# or any read-write path under /dev, is mounted with --dev-bind-try instead,
+# since --bind marks the mount nodev and blocks the device. Read-only entries
+# mount after the read-write ones, so a path listed both ways ends up
+# read-only. The file is read here, on the host, so it need not be reachable
+# inside the sandbox.
 
 # The agent cannot see the sandbox from inside, so it is told about it. Without
 # this note a permission error reads as a broken environment, and the agent
@@ -212,7 +215,7 @@ done
 # stays out of the note, because the user can change it between runs. Pi takes
 # the note as inline text (--append-system-prompt), so nothing has to be
 # written to disk.
-sandbox_note="This session runs inside a bubblewrap sandbox. A write that fails with a permission or read-only-filesystem error is being blocked by the sandbox: do not try to work around the mount. Ask the user to lift the restriction on that path. On the host they can add the path to $config_file and restart pi, or restart pi with BWRAP=0 to run without the sandbox."
+sandbox_note="This session runs inside a bubblewrap sandbox. A write that fails with a permission or read-only-filesystem error is being blocked by the sandbox: do not try to work around the mount. Ask the user to lift the restriction on that path. On the host they can add the path to $config_file with an rw entry and restart pi, or restart pi with BWRAP=0 to run without the sandbox."
 
 # /tmp is a private tmpfs that dies with the sandbox, and the scratchpad is
 # shared with every other agent that is running, so both need a rule.
@@ -238,8 +241,8 @@ esac
 
 # Build the bwrap command in "$@": start from pi's own arguments, put the real
 # binary in front, then prepend one bind per configured path. Prepending
-# reverses the configured order; every bind is read-write, so their relative
-# order does not matter.
+# reverses the order, so the path loops below run in the reverse of the order
+# the mounts need: read-only entries first, then read-write ones.
 
 if [ -n "$notice" ]; then
 	set -- "$real_pi" --append-system-prompt "$notice" "$@"
@@ -264,13 +267,42 @@ if [ -f "$config_file" ]; then
 	set -- --ro-bind "$config_file" "$config_file" "$@"
 fi
 
+# Read-only paths first: prepending them before the read-write loop puts them
+# later in bwrap's argument list, so they mount last and win when a path
+# appears in both lists.
 if [ -f "$config_file" ]; then
 	while IFS= read -r line || [ -n "$line" ]; do
 		line=$(trim "$line")
 		case "$line" in
 		"" | '#'* | hide-home*) continue ;;
 		esac
-		resolve_path "$line" || continue
+		case "$line" in
+		ro[[:space:]]*) path=${line#ro} ;;
+		*) continue ;;
+		esac
+		path=$(trim "$path")
+		[ -n "$path" ] || continue
+		resolve_path "$path" || continue
+		set -- --ro-bind-try "$path" "$path" "$@"
+	done <"$config_file"
+fi
+
+# Read-write paths, and bare paths, which count as read-write.
+if [ -f "$config_file" ]; then
+	while IFS= read -r line || [ -n "$line" ]; do
+		line=$(trim "$line")
+		case "$line" in
+		"" | '#'* | hide-home*) continue ;;
+		esac
+		case "$line" in
+		rw | ro) continue ;;
+		rw[[:space:]]*) path=${line#rw} ;;
+		ro[[:space:]]*) continue ;;
+		*) path=$line ;;
+		esac
+		path=$(trim "$path")
+		[ -n "$path" ] || continue
+		resolve_path "$path" || continue
 		# A device node needs a device bind: --bind mounts with nodev
 		# set, which denies access to the nodes under it. Anything
 		# under /dev counts, because the sandbox replaces /dev with a
