@@ -1,7 +1,7 @@
 #!/usr/bin/sh
+
 # Pi wrapper: run the agent inside a bubblewrap sandbox.
 #
-# Pi has no built-in sandbox and runs tools with the permissions of the user
 # Pi has no built-in sandbox and runs tools with the permissions of the user
 # account. This wrapper binds the whole filesystem read-only and re-binds only
 # the project directory, a scratchpad, and a few state directories read-write,
