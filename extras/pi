@@ -130,47 +130,6 @@ install | remove | uninstall | update | list | config | auth)
 	;;
 esac
 
-# The lock names the session file when the user chose one with --session. Every
-# other run is locked without a session, because the picker only knows the
-# default session layout and a custom directory would misname the file.
-named_session_file=
-previous=
-for argument in "$@"; do
-	if [ "$previous" = "--session" ]; then
-		named_session_file=$argument
-	fi
-	case "$argument" in
-	--session=*)
-		named_session_file=${argument#--session=}
-		;;
-	esac
-	previous=$argument
-done
-
-# The picker needs node; without it the run continues without a lock. A node
-# that is on PATH but cannot run, and a picker that exits non-zero, are
-# reported on stderr: the picker runs as a child process before the sandbox,
-# so an unread error would look like the session was never locked.
-picker=""
-if command -v node >/dev/null 2>&1; then
-	if node --version >/dev/null 2>&1; then
-		picker=$(dirname -- "$self")/pi-session-pick.mjs
-		[ -f "$picker" ] || picker=""
-	else
-		echo "pi-wrapper: node is on PATH but does not run; session locks are off." >&2
-	fi
-fi
-
-if [ "$management" = 0 ] && [ -n "$picker" ]; then
-	if [ -n "$named_session_file" ]; then
-		node "$picker" --agent-dir "$agent_dir" --cwd "$cwd" --pid "$$" --session-file "$named_session_file" >/dev/null ||
-			echo "pi-wrapper: session lock failed." >&2
-	else
-		node "$picker" --agent-dir "$agent_dir" --cwd "$cwd" --pid "$$" >/dev/null ||
-			echo "pi-wrapper: session lock failed." >&2
-	fi
-fi
-
 if [ "${BWRAP:-1}" = "0" ]; then
 	echo "pi-wrapper: bwrap is not isolating the agent; pi runs with full permissions." >&2
 	sleep 1

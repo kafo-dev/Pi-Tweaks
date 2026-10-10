@@ -10,8 +10,7 @@ run with the permissions of the user account. This wrapper binds the whole
 filesystem read-only and re-binds only the project directory, an agent
 scratchpad, and a few state directories read-write, so a session cannot write
 anywhere else under `$HOME`. It writes nothing to stderr on the sandboxed path,
-except when it starts from `$HOME` (see below) or a session lock fails
-(see [Session locks](#session-locks)); every session it starts carries
+except when it starts from `$HOME` (see below); every session it starts carries
 the system-prompt note described under
 [Sandbox notice](#sandbox-notice).
 
@@ -37,27 +36,6 @@ An npm prefix or version-manager install usually lands outside `/usr/bin`,
 so the `PATH` search is what makes the wrapper work on those systems. The
 resolved binary is read through the sandbox's read-only root, so it does not
 need to be a system package.
-
-### Session locks
-
-Pi keeps no lock on the session it has open: it opens the JSONL file only to
-append, so a second process cannot see that the session is in use. The wrapper
-writes a lock file per run instead, before pi starts, under
-`<cacheDir>/pi-tweaks/session-locks/`. A lock records the process id, the
-working directory, the start time, and the session file when `--session` names
-one.
-
-`extensions/experiments/prune-sessions.ts` reads the locks, so it does not move
-a session that a live process still holds. "Held" means a live pi process
-recorded a lock for that session, or was started after the session file was
-last written.
-
-`extras/pi-session-pick.mjs` writes the lock. Locks of processes that have
-exited are removed the next time the locks are read, so they do not accumulate.
-Node must be on `PATH`; without it the wrapper starts no lock. A `node` that is
-present but cannot run, and a picker that exits non-zero, are reported on
-stderr. A management subcommand (`install`, `remove`, `uninstall`, `update`,
-`list`, `config`, `auth`) starts no session and is not locked.
 
 ### What is writable
 
@@ -105,10 +83,7 @@ the session and keep its files there. The scratchpad is shared by every
 session, so the subdirectory keeps concurrent agents out of each other's way.
 
 The note travels as `--append-system-prompt` text, so the note itself needs no
-file. The wrapper writes one small lock file per run under
-`<cacheDir>/pi-tweaks/session-locks/`; see
-[Session locks](#session-locks).
-A management subcommand starts no session and gets no note.
+file. A management subcommand starts no session and gets no note.
 
 ### Scratchpad
 
@@ -205,7 +180,7 @@ one of them fails until the path is listed with `rw` in `wrapper-config.txt`.
 |----------|---------|
 | `BWRAP` | Set to `0` to skip the sandbox. The wrapper then warns and runs `pi` unsandboxed with the same arguments. |
 | `PI_CODING_AGENT_DIR` | Override the agent directory that is bound read-write. Default `~/.pi/agent`. The scratchpad and `wrapper-config.txt` move to its parent. |
-| `XDG_CACHE_HOME` | Override the cache directory that is bound read-write. Default `~/.cache`. Pi-Tweaks keeps its runtime state in `<cacheDir>/pi-tweaks`: the session locks and the time of the last automatic prune round. |
+| `XDG_CACHE_HOME` | Override the cache directory that is bound read-write. Default `~/.cache`. Pi-Tweaks keeps its runtime state in `<cacheDir>/pi-tweaks`: the time of the last automatic prune round. |
 | `XDG_DATA_HOME` | Override the data directory whose `Trash` is bound read-write. Default `~/.local/share`. |
 
 ### Notes and limitations
