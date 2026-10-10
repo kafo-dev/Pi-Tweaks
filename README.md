@@ -39,7 +39,7 @@ extension's settings and an `enabled` switch:
   "prompt-fragment": {
     "enabled": true,
     "fragments": [
-      { "path": "docs/style.md", "showPathToAgent": true, "stripFrontmatter": false }
+      { "path": "docs/style.md", "stripFrontmatter": false }
     ]
   },
   "exit-alias": { "enabled": true }
@@ -56,7 +56,7 @@ start (or `/reload`).
 |---------|----------|
 | `pi-bash-timeout` | `timeoutSeconds` (default 32) |
 | `notify` | `backend`, `topic`, `server`; `/pi-tweaks notify` writes them back here |
-| `prompt-fragment` | `fragments`: paths whose full text is pinned into the system prompt |
+| `prompt-fragment` | `fragments`: paths whose full text is prepended to the system prompt |
 | `exit-alias` | `enabled` only |
 | `snippet` | `enabled` only |
 | `pi-tweaks` | `enabled` only; the `/pi-tweaks` command itself |
@@ -69,20 +69,16 @@ that names it:
 
 ```json
 [
-  { "path": "../docs/style.md", "showPathToAgent": true, "stripFrontmatter": false },
-  { "path": "~/notes/style.md", "showPathToAgent": false, "stripFrontmatter": true },
-  { "path": "/absolute/path/notes.md", "showPathToAgent": false, "stripFrontmatter": true }
+  { "path": "../docs/style.md", "stripFrontmatter": false },
+  { "path": "~/notes/style.md", "stripFrontmatter": true },
+  { "path": "/absolute/path/notes.md", "stripFrontmatter": true }
 ]
 ```
 
-All three keys are required: `path`, the boolean `showPathToAgent`, and the
-boolean `stripFrontmatter`. `stripFrontmatter` removes a leading YAML
-frontmatter block. Either boolean true wraps the document in a `<document>`
-element; `showPathToAgent` adds the path to it, so the model can read the file
-for the parts the block omits. The reported path is relative to the working
-directory when the document is under it, `~/…` when it is under the home
-directory, and absolute otherwise. With both false the document text is
-appended as-is.
+Both keys are required: `path` and the boolean `stripFrontmatter`.
+`stripFrontmatter` removes a leading YAML frontmatter block. The fragment text
+is prepended verbatim to the top of the system prompt, in config order, with no
+wrapper; a path named twice is prepended once.
 
 Settings written by an extension (`/pi-tweaks notify`) merge into the file, so
 the other sections and the `enabled` switch survive.
@@ -119,7 +115,7 @@ its own, `/pi-tweaks` prints the subcommands that are available.
 | [`lib/session-store.mjs`](lib/session-store.mjs) | Session-file lookup, session names, and the active-session locks. Plain JavaScript, shared by the prune-sessions experiment and the sandbox wrapper's session picker. |
 | [`lib/pi-tweaks-cache.mjs`](lib/pi-tweaks-cache.mjs) | The directory for Pi-Tweaks runtime state, `$XDG_CACHE_HOME/pi-tweaks` (default `~/.cache/pi-tweaks`): the session locks and the last prune round. Runtime state does not belong in the agent directory that holds configuration, and the sandbox wrapper binds the cache directory read-write. Plain JavaScript, shared by the extensions and the wrapper's session picker. |
 | [`extensions/notify/`](extensions/notify/) | Extension that alerts on a desktop and, optionally, pushes to a phone over ntfy when pi settles a turn or blocks on a dialog. Terminal notifications on by default, push off. See its [README](extensions/notify/README.md). |
-| [`extensions/prompt-fragment.ts`](extensions/prompt-fragment.ts) | Extension that appends the full text of the Markdown documents named in `prompt-fragment.fragments` to the system prompt on every turn, so they apply without the model deciding to read them. A `~` path resolves against the home directory, and any other relative path against the config file that names it. A document is appended as-is unless `showPathToAgent` or `stripFrontmatter` is true, which wraps it in a `<document>` element and, for `showPathToAgent`, writes a path into it — working-directory-relative, `~/…` under home, or absolute. The text is deterministic, which keeps it inside the provider's cached prefix. An invalid config or an unreadable document is reported as an error, and nothing is pinned for that turn. `/pi-tweaks prompt-fragment` reports the resolved set, the byte size, and an estimated token count (four characters per token). |
+| [`extensions/prompt-fragment.ts`](extensions/prompt-fragment.ts) | Extension that prepends the full text of the Markdown documents named in `prompt-fragment.fragments` to the top of the system prompt on every turn, so they apply without the model deciding to read them. A `~` path resolves against the home directory, and any other relative path against the config file that names it. `stripFrontmatter` removes a leading YAML frontmatter block. The text is deterministic, which keeps it inside the provider's cached prefix. An invalid config or an unreadable document is reported as an error, and nothing is prepended for that turn. `/pi-tweaks prompt-fragment` reports the resolved set, the byte size, and an estimated token count (four characters per token). |
 | [`extensions/exit-alias.ts`](extensions/exit-alias.ts) | Extension that adds `/exit` as an alias for pi's built-in `/quit`. |
 | [`extensions/snippet.ts`](extensions/snippet.ts) | Extension whose `/snippet` command opens a picker over the code in the conversation: one tab for fenced code blocks (listed with the language and the first and last lines), one for inline spans. The most recent block is first, and Enter copies the selected text to the system clipboard without the backticks or the language mark. Only the text of user and assistant messages on the active branch is read; tool results and tool-call arguments are skipped. |
 | [`extensions/pi-bash-timeout.ts`](extensions/pi-bash-timeout.ts) | Extension that fills in the built-in `bash` tool's `timeout` parameter (in seconds) when the model omits it, so a hung command cannot stall a turn. An explicit model value wins. The default is `pi-bash-timeout.timeoutSeconds` (32). |

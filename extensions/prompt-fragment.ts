@@ -1,5 +1,5 @@
 /**
- * prompt-fragment — append the full text of chosen Markdown documents to the
+ * prompt-fragment — prepend the full text of chosen Markdown documents to the
  * system prompt.
  *
  * pi loads skills on demand: only each skill's name, description, and path
@@ -15,30 +15,26 @@
  * holds the same array under `fragments`:
  *
  *   [
- *     { "path": "docs/style.md", "showPathToAgent": true, "stripFrontmatter": false }
+ *     { "path": "docs/style.md", "stripFrontmatter": false }
  *   ]
  *
  *   { "prompt-fragment": { "enabled": true, "fragments": [ ... ] } }
  *
  * `path` is required. A path that starts with `~` resolves against the home
  * directory; any other relative path resolves against the directory of the
- * config file that names it. `showPathToAgent` is required: when true, the
- * path is written into the block, so the model can read the file again for the
- * parts the block omits. The path is relative to the working directory when the
- * document is under it, `~/…` when it is under the home directory, and absolute
- * otherwise. `stripFrontmatter` is required too: when true, a leading YAML
- * frontmatter block is removed, for a document that is also a skill.
+ * config file that names it. `stripFrontmatter` is required too: when true, a
+ * leading YAML frontmatter block is removed, for a document that is also a
+ * skill.
  *
- * A document is appended verbatim. It is wrapped in a `<document>` element only
- * when `showPathToAgent` or `stripFrontmatter` is true; the element carries the
- * path when `showPathToAgent` is true. The text is byte-identical on every turn
- * and follows config order, so it stays inside the provider's cached prefix.
+ * Each fragment is prepended verbatim to the top of the system prompt, in
+ * config order, with no wrapper. The text is byte-identical on every turn, so
+ * it stays inside the provider's cached prefix.
  *
  * An invalid config, an invalid entry, or a document that cannot be read is an
- * error: nothing is pinned for that turn and the error is reported in the UI.
- * A config that does not exist at all is not an error; the extension is simply
- * off. Run /pi-tweaks prompt-fragment to inspect the resolved set; the command
- * lives in pi-tweaks.ts and calls reportPromptFragments below.
+ * error: nothing is prepended for that turn and the error is reported in the
+ * UI. A config that does not exist at all is not an error; the extension is
+ * simply off. Run /pi-tweaks prompt-fragment to inspect the resolved set; the
+ * command lives in pi-tweaks.ts and calls reportPromptFragments below.
  * `"enabled": false` turns the extension off.
  */
 
@@ -64,8 +60,6 @@ const FRAGMENTS_KEY = "fragments";
 type FragmentEntry = {
 	/** Path as written in the config file, absolute or relative to it. */
 	path: string;
-	/** Whether the resolved path is written into the document element. */
-	showPathToAgent: boolean;
 	/** Whether a leading YAML frontmatter block is removed. */
 	stripFrontmatter: boolean;
 };
@@ -90,20 +84,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** One fragment object, or null when any of its three required keys is absent. */
+/** One fragment object, or null when either required key is absent. */
 function parseFragment(value: unknown): FragmentEntry | null {
 	if (!isRecord(value)) return null;
 
 	const path = value.path;
 	if (typeof path !== "string" || path.length === 0) return null;
 
-	const showPathToAgent = value.showPathToAgent;
-	if (typeof showPathToAgent !== "boolean") return null;
-
 	const stripFrontmatter = value.stripFrontmatter;
 	if (typeof stripFrontmatter !== "boolean") return null;
 
-	return { path, showPathToAgent, stripFrontmatter };
+	return { path, stripFrontmatter };
 }
 
 /** The fragments of a value that must be an array, plus the indices that failed. */
@@ -224,15 +215,7 @@ function build(
 			continue;
 		}
 
-		const keepTags = fragment.showPathToAgent || fragment.stripFrontmatter;
-		const attributes = fragment.showPathToAgent
-			? ` path="${displayPath(path, cwd)}"`
-			: "";
-		if (keepTags) {
-			parts.push(`<document${attributes}>\n${body}\n</document>`);
-		} else {
-			parts.push(body);
-		}
+		parts.push(body);
 	}
 
 	return { text: parts.join("\n\n"), missing };
@@ -249,7 +232,7 @@ function describeProblem(
 	const lines = [`prompt-fragment: ${configPath}`];
 	if (invalid.length > 0) {
 		lines.push(
-			`invalid entries (need path, showPathToAgent, and stripFrontmatter): ${invalid.join(", ")}`,
+			`invalid entries (need path and stripFrontmatter): ${invalid.join(", ")}`,
 		);
 	}
 	if (missing.length > 0) lines.push(`missing: ${missing.join(", ")}`);
@@ -288,13 +271,13 @@ export function reportPromptFragments(ctx: ExtensionCommandContext): void {
 		`fragments: ${total}`,
 		`resolved: ${total - missing.length} of ${total}`,
 		failed
-			? "appended: none (errors below)"
-			: `appended: ${Buffer.byteLength(text)} bytes (~${tokens} tokens)`,
+			? "prepended: none (errors below)"
+			: `prepended: ${Buffer.byteLength(text)} bytes (~${tokens} tokens)`,
 	];
 	if (missing.length > 0) lines.push(`missing: ${missing.join(", ")}`);
 	if (resolved.invalid.length > 0) {
 		lines.push(
-			`invalid entries (need path, showPathToAgent, and stripFrontmatter): ${resolved.invalid.join(", ")}`,
+			`invalid entries (need path and stripFrontmatter): ${resolved.invalid.join(", ")}`,
 		);
 	}
 	ctx.ui.notify(lines.join("\n"), failed ? "error" : "info");
@@ -330,6 +313,6 @@ export default function promptFragment(pi: ExtensionAPI) {
 		}
 		if (text.length === 0) return;
 
-		return { systemPrompt: `${event.systemPrompt}\n\n${text}\n` };
+		return { systemPrompt: `${text}\n\n${event.systemPrompt}` };
 	});
 }
