@@ -12,8 +12,8 @@
  *     "notify": {
  *       "enabled": true,
  *       "backend": "termcodes",
- *       "phone": "off",
- *       "device": ""
+ *       "topic": "",
+ *       "server": "https://ntfy.sh"
  *     },
  *     "exit-alias": { "enabled": false }
  *   }

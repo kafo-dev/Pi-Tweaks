@@ -15,8 +15,8 @@ The `pi` manifest in [`package.json`](package.json) declares the resources; pi
 installs the dependencies and discovers each skill's `SKILL.md` plus every
 extension listed in `pi.extensions`. The skills load on demand and are available
 as `/skill:browser-tools` and `/skill:web-tools`; the packaged extensions are
-loaded at startup. `notify` alerts on the terminal out of the box; its phone
-leg stays off until configured. The experimental extensions in
+loaded at startup. `notify` alerts on the terminal out of the box; its push
+stays off until a topic is set. The experimental extensions in
 `extensions/experiments/` are loaded too, but each registers nothing until its section is enabled in
 `pi-tweaks.json` (`experiment-prune-sessions`, `experiment-pop`, `experiment-url`).
 
@@ -33,8 +33,8 @@ extension's settings and an `enabled` switch:
   "notify": {
     "enabled": true,
     "backend": "termcodes",
-    "phone": "off",
-    "device": ""
+    "topic": "",
+    "server": "https://ntfy.sh"
   },
   "pin-document": {
     "enabled": true,
@@ -55,7 +55,7 @@ start (or `/reload`).
 | Section | Settings |
 |---------|----------|
 | `pi-bash-timeout` | `timeoutSeconds` (default 32) |
-| `notify` | `backend`, `phone`, `device`; `/pi-tweaks notify` writes them back here |
+| `notify` | `backend`, `topic`, `server`; `/pi-tweaks notify` writes them back here |
 | `pin-document` | `documents`: paths whose full text is pinned into the system prompt |
 | `exit-alias` | `enabled` only |
 | `snippet` | `enabled` only |
@@ -118,7 +118,7 @@ its own, `/pi-tweaks` prints the subcommands that are available.
 | [`lib/pi-tweaks-config.ts`](lib/pi-tweaks-config.ts) | Shared configuration for every extension: reads and writes `pi-tweaks.json`, applies the `enabled` switch and the per-extension settings, and validates each value. |
 | [`lib/session-store.mjs`](lib/session-store.mjs) | Session-file lookup, session names, and the active-session locks. Plain JavaScript, shared by the prune-sessions experiment and the sandbox wrapper's session picker. |
 | [`lib/pi-tweaks-cache.mjs`](lib/pi-tweaks-cache.mjs) | The directory for Pi-Tweaks runtime state, `$XDG_CACHE_HOME/pi-tweaks` (default `~/.cache/pi-tweaks`): the session locks and the last prune round. Runtime state does not belong in the agent directory that holds configuration, and the sandbox wrapper binds the cache directory read-write. Plain JavaScript, shared by the extensions and the wrapper's session picker. |
-| [`extensions/notify/`](extensions/notify/) | Extension that alerts on a desktop and, optionally, a KDE Connect phone when pi settles a turn or blocks on a dialog. Terminal notifications on by default, phone off. See its [README](extensions/notify/README.md). |
+| [`extensions/notify/`](extensions/notify/) | Extension that alerts on a desktop and, optionally, pushes to a phone over ntfy when pi settles a turn or blocks on a dialog. Terminal notifications on by default, push off. See its [README](extensions/notify/README.md). |
 | [`extensions/pin-document.ts`](extensions/pin-document.ts) | Extension that appends the full text of the Markdown documents named in `pin-document.documents` to the system prompt on every turn, so they apply without the model deciding to read them. A `~` path resolves against the home directory, and any other relative path against the config file that names it. A document is appended as-is unless `showPathToAgent` or `stripFrontmatter` is true, which wraps it in a `<document>` element and, for `showPathToAgent`, writes a path into it — working-directory-relative, `~/…` under home, or absolute. The text is deterministic, which keeps it inside the provider's cached prefix. An invalid config or an unreadable document is reported as an error, and nothing is pinned for that turn. `/pi-tweaks pin-document` reports the resolved set, the byte size, and an estimated token count (four characters per token). |
 | [`extensions/exit-alias.ts`](extensions/exit-alias.ts) | Extension that adds `/exit` as an alias for pi's built-in `/quit`. |
 | [`extensions/snippet.ts`](extensions/snippet.ts) | Extension whose `/snippet` command opens a picker over the code in the conversation: one tab for fenced code blocks (listed with the language and the first and last lines), one for inline spans. The most recent block is first, and Enter copies the selected text to the system clipboard without the backticks or the language mark. Only the text of user and assistant messages on the active branch is read; tool results and tool-call arguments are skipped. |

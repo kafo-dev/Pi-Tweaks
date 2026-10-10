@@ -1,7 +1,7 @@
 # notify
 
 Alerts when pi stops and needs attention: a desktop notification, and
-optionally an alarm on a phone over KDE Connect.
+optionally a push to a phone over [ntfy](https://ntfy.sh).
 
 | Event | When |
 |-------|------|
@@ -21,9 +21,9 @@ updating.
 
 ## Configure
 
-`backend` defaults to `termcodes` and `phone` to `off`: terminal notifications
-work straight away, and no phone is rung until one is set. Settings live in the
-`notify` section of `pi-tweaks.json` in pi's agent directory
+`backend` defaults to `termcodes` and `topic` to `""`: terminal notifications
+work straight away, and no phone is pushed to until a topic is set. Settings
+live in the `notify` section of `pi-tweaks.json` in pi's agent directory
 (`$PI_CODING_AGENT_DIR/pi-tweaks.json`, or `~/.pi/agent/pi-tweaks.json`).
 `/pi-tweaks notify` creates and updates that section; the other sections and
 the `enabled` switch are preserved.
@@ -33,8 +33,8 @@ the `enabled` switch are preserved.
   "notify": {
     "enabled": true,
     "backend": "termcodes",
-    "phone": "ring",
-    "device": ""
+    "topic": "pi-a1b2c3",
+    "server": "https://ntfy.sh"
   }
 }
 ```
@@ -44,8 +44,12 @@ Set `"enabled": false` to turn the extension off.
 | Key | Values | Meaning |
 |-----|--------|---------|
 | `backend` | `off`, `termcodes`, `notify-send` | `termcodes` writes OSC 777, understood by Ghostty, iTerm2 and WezTerm. `notify-send` is a freedesktop notification and needs a desktop session. |
-| `phone` | `off`, `ping`, `ring` | `ping` sends a `--ping-msg` with the reason; `ring` is the loud Find My Phone alarm and drops the message. |
-| `device` | a KDE Connect device id, or `""` | Empty auto-detects the first available device via `kdeconnect-cli -a --id-only`. |
+| `topic` | an ntfy topic, or `""` | Empty for no push. The body POSTs to `<server>/<topic>`; subscribe to that topic in the ntfy app. |
+| `server` | an http(s) URL | Base URL of the ntfy server. Default `https://ntfy.sh`; point it at a self-hosted instance. |
+
+The push is a plain HTTP POST, so it needs no client on the desktop and no
+account. Pick a topic that is hard to guess, because anyone who knows it can
+publish to it on the public server.
 
 ## Commands
 
@@ -55,17 +59,17 @@ command answers it. Each call reads the section and writes it back.
 ```
 /pi-tweaks notify                     show settings and the file path
 /pi-tweaks notify backend <value>
-/pi-tweaks notify phone <value>
-/pi-tweaks notify device <id|auto>
+/pi-tweaks notify topic <topic|off>
+/pi-tweaks notify server <url>
 /pi-tweaks notify test                fire a dialog, so the whole path is heard
 ```
 
 ## Requirements
 
 - `notify-send` (package `libnotify`) for the `notify-send` backend.
-- `kdeconnect-cli` for the phone. `ring` needs the **Find My Phone** plugin
-  enabled on both phone and desktop; `ping` needs **Ping**.
+- An ntfy topic for the push. No local client is needed; the extension POSTs
+  the message itself.
 
 Missing tools are not an error: the call simply fails silently, so pi is never
 blocked by a broken notifier. Headless runs (`-p`, `--mode json`, subagents)
-never notify — `ctx.hasUI` is false there, so a script cannot ring a phone.
+never notify — `ctx.hasUI` is false there, so a script cannot push to a phone.

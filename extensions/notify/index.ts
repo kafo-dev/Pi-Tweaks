@@ -11,21 +11,21 @@
  *     "notify": {
  *       "enabled": true,
  *       "backend": "off" | "termcodes" | "notify-send",
- *       "phone":   "off" | "ping" | "ring",
- *       "device":  "kdeconnect device id"     // empty = auto-detect
+ *       "topic":   "" | "ntfy topic",
+ *       "server":  "https://ntfy.sh"
  *     }
  *   }
  *
- * `backend` defaults to "termcodes" and `phone` to "off": installing the
- * package gives you terminal notifications immediately, and no phone is rung
- * until you ask for one. `"enabled": false` turns the extension off. The
- * `/pi-tweaks notify` subcommand writes changes back to that file.
+ * `backend` defaults to "termcodes" and `topic` to "": installing the
+ * package gives you terminal notifications immediately, and no phone is
+ * pushed to until you set a topic. `"enabled": false` turns the extension off.
+ * The `/pi-tweaks notify` subcommand writes changes back to that file.
  *
  * Commands (registered by pi-tweaks.ts, the package's one command):
  *   /pi-tweaks notify                     show settings
  *   /pi-tweaks notify backend <value>
- *   /pi-tweaks notify phone <value>
- *   /pi-tweaks notify device <id|auto>
+ *   /pi-tweaks notify topic <topic|off>
+ *   /pi-tweaks notify server <url>
  *   /pi-tweaks notify test                fire a dialog to exercise the path
  *
  * The command reads and writes the section on every call. pi loads each
@@ -33,11 +33,12 @@
  * no state that could go stale.
  *
  * Headless runs (`-p`, `--mode json`, subagents) never notify: `ctx.hasUI` is
- * false there, and a script must not ring your phone.
+ * false there, and a script must not push to your phone.
  *
  * `termcodes` is OSC 777 (Ghostty, iTerm2, WezTerm); `notify-send` needs a
- * desktop session. Phone needs `kdeconnect-cli`: `ring` needs KDE Connect's
- * Find My Phone plugin, `ping` needs Ping.
+ * desktop session. A push POSTs the body to the ntfy topic on `server`, which
+ * defaults to the hosted `https://ntfy.sh`; subscribe to that topic in the ntfy
+ * app to receive it.
  */
 
 import { execFile } from "node:child_process";
@@ -58,17 +59,21 @@ const EXTENSION = "notify";
 
 interface Settings {
 	backend: string;
-	phone: string;
-	device: string;
+	topic: string;
+	server: string;
 }
 
-const DEFAULTS: Settings = { backend: "termcodes", phone: "off", device: "" };
+const DEFAULTS: Settings = {
+	backend: "termcodes",
+	topic: "",
+	server: "https://ntfy.sh",
+};
 
 /** Allowed values per key. An empty list means "any string". */
 const OPTIONS: Record<keyof Settings, string[]> = {
 	backend: ["off", "termcodes", "notify-send"],
-	phone: ["off", "ping", "ring"],
-	device: [],
+	topic: [],
+	server: [],
 };
 
 const KEYS = Object.keys(OPTIONS) as (keyof Settings)[];
@@ -89,7 +94,7 @@ function saveSettings(settings: Settings) {
 }
 
 function describe(settings: Settings): string {
-	const values = KEYS.map((key) => `${key}=${settings[key] || "(auto)"}`);
+	const values = KEYS.map((key) => `${key}=${settings[key] || "(off)"}`);
 	return `notify: ${values.join(", ")}`;
 }
 
@@ -101,39 +106,26 @@ function notifyLocal(settings: Settings, body: string) {
 	}
 }
 
-let detectedDevice: string | null = null;
-
-function resolveDevice(settings: Settings): Promise<string | undefined> {
-	if (settings.device) return Promise.resolve(settings.device);
-	if (detectedDevice) return Promise.resolve(detectedDevice);
-	return new Promise((resolve) => {
-		execFile("kdeconnect-cli", ["-a", "--id-only"], (err, out) => {
-			if (!err) detectedDevice = out.trim().split("\n")[0] || null;
-			resolve(detectedDevice ?? undefined);
-		});
-	});
+/** POST the body to the ntfy topic. A failed push is dropped, never thrown. */
+function notifyNtfy(settings: Settings, body: string) {
+	if (!settings.topic) return;
+	if (!settings.server) return;
+	const server = settings.server.replace(/\/+$/, "");
+	const url = `${server}/${encodeURIComponent(settings.topic)}`;
+	void fetch(url, {
+		method: "POST",
+		headers: { Title: "Pi", Tags: "robot" },
+		body,
+	}).catch(() => {});
 }
 
-async function notifyPhone(settings: Settings, body: string) {
-	if (settings.phone === "off") return;
-	const device = await resolveDevice(settings);
-	if (!device) return;
-	execFile(
-		"kdeconnect-cli",
-		settings.phone === "ring"
-			? ["-d", device, "--ring"]
-			: ["-d", device, "--ping-msg", body],
-		() => {},
-	);
-}
-
-async function notifyUser(ctx: ExtensionContext, body: string) {
+function notifyUser(ctx: ExtensionContext, body: string) {
 	// Headless runs (print, JSON, subagents) have no one watching, and must not
-	// ring the phone from a script.
+	// push to a phone from a script.
 	if (!ctx.hasUI) return;
 	const settings = loadSettings();
 	notifyLocal(settings, body);
-	await notifyPhone(settings, body);
+	notifyNtfy(settings, body);
 }
 
 /**
@@ -167,12 +159,12 @@ export async function runNotify(
 		return;
 	}
 	if (!value) {
-		ctx.ui.notify(`${name} = ${settings[key] || "(auto)"}`, "info");
+		ctx.ui.notify(`${name} = ${settings[key] || "(off)"}`, "info");
 		return;
 	}
 
-	if (key === "device" && value === "auto") {
-		settings.device = "";
+	if (key === "topic" && value === "off") {
+		settings.topic = "";
 		saveSettings(settings);
 		ctx.ui.notify(describe(settings), "info");
 		return;
@@ -181,9 +173,13 @@ export async function runNotify(
 	const valid = choices.length ? choices.includes(value) : value !== "";
 	if (!valid) {
 		ctx.ui.notify(
-			`${name} must be one of: ${choices.join(", ") || "a device id"}`,
+			`${name} must be one of: ${choices.join(", ") || "a non-empty value"}`,
 			"error",
 		);
+		return;
+	}
+	if (key === "server" && !/^https?:\/\/\S+$/.test(value)) {
+		ctx.ui.notify("server must be an http(s) URL", "error");
 		return;
 	}
 
