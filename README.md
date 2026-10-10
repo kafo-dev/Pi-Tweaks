@@ -36,9 +36,9 @@ extension's settings and an `enabled` switch:
     "topic": "",
     "server": "https://ntfy.sh"
   },
-  "pin-document": {
+  "prompt-fragment": {
     "enabled": true,
-    "documents": [
+    "fragments": [
       { "path": "docs/style.md", "showPathToAgent": true, "stripFrontmatter": false }
     ]
   },
@@ -56,14 +56,14 @@ start (or `/reload`).
 |---------|----------|
 | `pi-bash-timeout` | `timeoutSeconds` (default 32) |
 | `notify` | `backend`, `topic`, `server`; `/pi-tweaks notify` writes them back here |
-| `pin-document` | `documents`: paths whose full text is pinned into the system prompt |
+| `prompt-fragment` | `fragments`: paths whose full text is pinned into the system prompt |
 | `exit-alias` | `enabled` only |
 | `snippet` | `enabled` only |
 | `pi-tweaks` | `enabled` only; the `/pi-tweaks` command itself |
 
-`pin-document` also reads a project file, `<cwd>/.pi/pin-document.json`, when
-the project is trusted; it takes precedence over the section. Both forms hold
-the same objects. A `path` that starts with `~` resolves against the home
+`prompt-fragment` also reads a project file, `<cwd>/.pi/prompt-fragment.json`,
+when the project is trusted; it takes precedence over the section. Both forms
+hold the same objects. A `path` that starts with `~` resolves against the home
 directory; any other relative `path` resolves against the directory of the file
 that names it:
 
@@ -98,7 +98,7 @@ that lives with the rest of the extension's settings.
 ```
 /pi-tweaks list              every packaged extension, and whether it is enabled
 /pi-tweaks notify …          the notify settings, and a test dialog
-/pi-tweaks pin-document      the documents pin-document resolves, and its errors
+/pi-tweaks prompt-fragment   the fragments prompt-fragment resolves, and its errors
 /pi-tweaks prune-sessions …  a pruning round over the session store
 ```
 
@@ -119,7 +119,7 @@ its own, `/pi-tweaks` prints the subcommands that are available.
 | [`lib/session-store.mjs`](lib/session-store.mjs) | Session-file lookup, session names, and the active-session locks. Plain JavaScript, shared by the prune-sessions experiment and the sandbox wrapper's session picker. |
 | [`lib/pi-tweaks-cache.mjs`](lib/pi-tweaks-cache.mjs) | The directory for Pi-Tweaks runtime state, `$XDG_CACHE_HOME/pi-tweaks` (default `~/.cache/pi-tweaks`): the session locks and the last prune round. Runtime state does not belong in the agent directory that holds configuration, and the sandbox wrapper binds the cache directory read-write. Plain JavaScript, shared by the extensions and the wrapper's session picker. |
 | [`extensions/notify/`](extensions/notify/) | Extension that alerts on a desktop and, optionally, pushes to a phone over ntfy when pi settles a turn or blocks on a dialog. Terminal notifications on by default, push off. See its [README](extensions/notify/README.md). |
-| [`extensions/pin-document.ts`](extensions/pin-document.ts) | Extension that appends the full text of the Markdown documents named in `pin-document.documents` to the system prompt on every turn, so they apply without the model deciding to read them. A `~` path resolves against the home directory, and any other relative path against the config file that names it. A document is appended as-is unless `showPathToAgent` or `stripFrontmatter` is true, which wraps it in a `<document>` element and, for `showPathToAgent`, writes a path into it — working-directory-relative, `~/…` under home, or absolute. The text is deterministic, which keeps it inside the provider's cached prefix. An invalid config or an unreadable document is reported as an error, and nothing is pinned for that turn. `/pi-tweaks pin-document` reports the resolved set, the byte size, and an estimated token count (four characters per token). |
+| [`extensions/prompt-fragment.ts`](extensions/prompt-fragment.ts) | Extension that appends the full text of the Markdown documents named in `prompt-fragment.fragments` to the system prompt on every turn, so they apply without the model deciding to read them. A `~` path resolves against the home directory, and any other relative path against the config file that names it. A document is appended as-is unless `showPathToAgent` or `stripFrontmatter` is true, which wraps it in a `<document>` element and, for `showPathToAgent`, writes a path into it — working-directory-relative, `~/…` under home, or absolute. The text is deterministic, which keeps it inside the provider's cached prefix. An invalid config or an unreadable document is reported as an error, and nothing is pinned for that turn. `/pi-tweaks prompt-fragment` reports the resolved set, the byte size, and an estimated token count (four characters per token). |
 | [`extensions/exit-alias.ts`](extensions/exit-alias.ts) | Extension that adds `/exit` as an alias for pi's built-in `/quit`. |
 | [`extensions/snippet.ts`](extensions/snippet.ts) | Extension whose `/snippet` command opens a picker over the code in the conversation: one tab for fenced code blocks (listed with the language and the first and last lines), one for inline spans. The most recent block is first, and Enter copies the selected text to the system clipboard without the backticks or the language mark. Only the text of user and assistant messages on the active branch is read; tool results and tool-call arguments are skipped. |
 | [`extensions/pi-bash-timeout.ts`](extensions/pi-bash-timeout.ts) | Extension that fills in the built-in `bash` tool's `timeout` parameter (in seconds) when the model omits it, so a hung command cannot stall a turn. An explicit model value wins. The default is `pi-bash-timeout.timeoutSeconds` (32). |

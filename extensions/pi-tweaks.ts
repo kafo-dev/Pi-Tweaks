@@ -5,7 +5,7 @@
  *
  *   /pi-tweaks list              the packaged extensions, split by enabled state
  *   /pi-tweaks notify …          the notify extension's settings and test
- *   /pi-tweaks pin-document      the documents pin-document resolves
+ *   /pi-tweaks prompt-fragment   the fragments prompt-fragment resolves
  *   /pi-tweaks prune-sessions …  a pruning round over the session store
  *
  * A subcommand is named after the extension that answers it, and that
@@ -34,7 +34,7 @@ import {
 } from "../lib/pi-tweaks-config";
 import { runPruneSessions } from "./experiments/prune-sessions";
 import { runNotify } from "./notify/index";
-import { reportPinnedDocuments } from "./pin-document";
+import { reportPromptFragments } from "./prompt-fragment";
 
 const EXTENSION = "pi-tweaks";
 
@@ -63,11 +63,11 @@ const SUBCOMMANDS: Array<[name: string, subcommand: Subcommand]> = [
 		},
 	],
 	[
-		"pin-document",
+		"prompt-fragment",
 		{
-			extension: "pin-document",
-			description: "the documents pin-document resolves, and its errors",
-			handler: (_args, ctx) => reportPinnedDocuments(ctx),
+			extension: "prompt-fragment",
+			description: "the fragments prompt-fragment resolves, and its errors",
+			handler: (_args, ctx) => reportPromptFragments(ctx),
 		},
 	],
 	[

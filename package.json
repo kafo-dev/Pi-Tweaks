@@ -17,7 +17,7 @@
 			"./extensions/notify/index.ts",
 			"./extensions/pi-bash-timeout.ts",
 			"./extensions/exit-alias.ts",
-			"./extensions/pin-document.ts",
+			"./extensions/prompt-fragment.ts",
 			"./extensions/snippet.ts",
 			"./extensions/experiments/prune-sessions.ts",
 			"./extensions/experiments/pop.ts",

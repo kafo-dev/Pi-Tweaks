@@ -1,5 +1,5 @@
 /**
- * pin-document — append the full text of chosen Markdown documents to the
+ * prompt-fragment — append the full text of chosen Markdown documents to the
  * system prompt.
  *
  * pi loads skills on demand: only each skill's name, description, and path
@@ -8,17 +8,17 @@
  * the system prompt on every turn, so their rules always apply.
  *
  * Config, first found wins:
- *   <cwd>/.pi/pin-document.json                 project, honored only when trusted
- *   `pin-document.documents` in pi-tweaks.json  global (see pi-tweaks-config.ts)
+ *   <cwd>/.pi/prompt-fragment.json                 project, honored only when trusted
+ *   `prompt-fragment.fragments` in pi-tweaks.json  global (see pi-tweaks-config.ts)
  *
- * The project file is a JSON array of document objects; the global section
- * holds the same array under `documents`:
+ * The project file is a JSON array of fragment objects; the global section
+ * holds the same array under `fragments`:
  *
  *   [
  *     { "path": "docs/style.md", "showPathToAgent": true, "stripFrontmatter": false }
  *   ]
  *
- *   { "pin-document": { "enabled": true, "documents": [ ... ] } }
+ *   { "prompt-fragment": { "enabled": true, "fragments": [ ... ] } }
  *
  * `path` is required. A path that starts with `~` resolves against the home
  * directory; any other relative path resolves against the directory of the
@@ -37,8 +37,8 @@
  * An invalid config, an invalid entry, or a document that cannot be read is an
  * error: nothing is pinned for that turn and the error is reported in the UI.
  * A config that does not exist at all is not an error; the extension is simply
- * off. Run /pi-tweaks pin-document to inspect the resolved set; the command
- * lives in pi-tweaks.ts and calls reportPinnedDocuments below.
+ * off. Run /pi-tweaks prompt-fragment to inspect the resolved set; the command
+ * lives in pi-tweaks.ts and calls reportPromptFragments below.
  * `"enabled": false` turns the extension off.
  */
 
@@ -57,11 +57,11 @@ import {
 	readSection,
 } from "../lib/pi-tweaks-config";
 
-const EXTENSION = "pin-document";
-const PROJECT_FILE = "pin-document.json";
-const DOCUMENTS_KEY = "documents";
+const EXTENSION = "prompt-fragment";
+const PROJECT_FILE = "prompt-fragment.json";
+const FRAGMENTS_KEY = "fragments";
 
-type DocumentEntry = {
+type FragmentEntry = {
 	/** Path as written in the config file, absolute or relative to it. */
 	path: string;
 	/** Whether the resolved path is written into the document element. */
@@ -72,9 +72,9 @@ type DocumentEntry = {
 
 type Resolved =
 	| {
-			kind: "documents";
+			kind: "fragments";
 			configPath: string;
-			documents: DocumentEntry[];
+			fragments: FragmentEntry[];
 			invalid: number[];
 	  }
 	| { kind: "missing" }
@@ -90,8 +90,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** One document object, or null when any of its three required keys is absent. */
-function parseDocument(value: unknown): DocumentEntry | null {
+/** One fragment object, or null when any of its three required keys is absent. */
+function parseFragment(value: unknown): FragmentEntry | null {
 	if (!isRecord(value)) return null;
 
 	const path = value.path;
@@ -106,23 +106,23 @@ function parseDocument(value: unknown): DocumentEntry | null {
 	return { path, showPathToAgent, stripFrontmatter };
 }
 
-/** The documents of a value that must be an array, plus the indices that failed. */
-function parseDocuments(
+/** The fragments of a value that must be an array, plus the indices that failed. */
+function parseFragments(
 	value: unknown,
-): { documents: DocumentEntry[]; invalid: number[] } | null {
+): { fragments: FragmentEntry[]; invalid: number[] } | null {
 	if (!Array.isArray(value)) return null;
 
-	const documents: DocumentEntry[] = [];
+	const fragments: FragmentEntry[] = [];
 	const invalid: number[] = [];
 	for (let index = 0; index < value.length; index += 1) {
-		const document = parseDocument(value[index]);
-		if (document) {
-			documents.push(document);
+		const fragment = parseFragment(value[index]);
+		if (fragment) {
+			fragments.push(fragment);
 		} else {
 			invalid.push(index);
 		}
 	}
-	return { documents, invalid };
+	return { fragments, invalid };
 }
 
 function readJson(path: string): unknown {
@@ -136,21 +136,21 @@ function readJson(path: string): unknown {
 function resolveConfig(ctx: ExtensionContext): Resolved {
 	const projectPath = join(ctx.cwd, CONFIG_DIR_NAME, PROJECT_FILE);
 	if (ctx.isProjectTrusted() && existsSync(projectPath)) {
-		const parsed = parseDocuments(readJson(projectPath));
+		const parsed = parseFragments(readJson(projectPath));
 		if (!parsed) return { kind: "malformed", path: projectPath };
-		return { kind: "documents", configPath: projectPath, ...parsed };
+		return { kind: "fragments", configPath: projectPath, ...parsed };
 	}
 
 	const configPath = configFilePath();
-	const configured = readSection(EXTENSION)?.[DOCUMENTS_KEY];
+	const configured = readSection(EXTENSION)?.[FRAGMENTS_KEY];
 	if (configured !== undefined) {
-		const parsed = parseDocuments(configured);
+		const parsed = parseFragments(configured);
 		if (!parsed) return { kind: "malformed", path: configPath };
-		return { kind: "documents", configPath, ...parsed };
+		return { kind: "fragments", configPath, ...parsed };
 	}
 
 	// `readSection` reads a malformed file as empty, so parse the file here to
-	// tell "no documents configured" apart from "the file does not parse".
+	// tell "no fragments configured" apart from "the file does not parse".
 	if (existsSync(configPath) && readJson(configPath) === null) {
 		return { kind: "malformed", path: configPath };
 	}
@@ -195,7 +195,7 @@ function stripFrontmatter(text: string): string {
 }
 
 function build(
-	documents: readonly DocumentEntry[],
+	fragments: readonly FragmentEntry[],
 	configDir: string,
 	cwd: string,
 ): Built {
@@ -203,8 +203,8 @@ function build(
 	const missing: string[] = [];
 	const parts: string[] = [];
 
-	for (const document of documents) {
-		const path = resolve(configDir, expandHome(document.path));
+	for (const fragment of fragments) {
+		const path = resolve(configDir, expandHome(fragment.path));
 		if (seen.has(path)) continue;
 		seen.add(path);
 
@@ -215,7 +215,7 @@ function build(
 			missing.push(displayPath(path, cwd));
 			continue;
 		}
-		if (document.stripFrontmatter) {
+		if (fragment.stripFrontmatter) {
 			body = stripFrontmatter(body);
 		}
 		body = body.trim();
@@ -224,8 +224,8 @@ function build(
 			continue;
 		}
 
-		const keepTags = document.showPathToAgent || document.stripFrontmatter;
-		const attributes = document.showPathToAgent
+		const keepTags = fragment.showPathToAgent || fragment.stripFrontmatter;
+		const attributes = fragment.showPathToAgent
 			? ` path="${displayPath(path, cwd)}"`
 			: "";
 		if (keepTags) {
@@ -246,7 +246,7 @@ function describeProblem(
 ): string | null {
 	if (invalid.length === 0 && missing.length === 0) return null;
 
-	const lines = [`pin-document: ${configPath}`];
+	const lines = [`prompt-fragment: ${configPath}`];
 	if (invalid.length > 0) {
 		lines.push(
 			`invalid entries (need path, showPathToAgent, and stripFrontmatter): ${invalid.join(", ")}`,
@@ -256,36 +256,36 @@ function describeProblem(
 	return lines.join("\n");
 }
 
-/** Report what `/pi-tweaks pin-document` resolves, for the package's command. */
-export function reportPinnedDocuments(ctx: ExtensionCommandContext): void {
+/** Report what `/pi-tweaks prompt-fragment` resolves, for the package's command. */
+export function reportPromptFragments(ctx: ExtensionCommandContext): void {
 	const resolved = resolveConfig(ctx);
 	if (resolved.kind === "missing") {
 		ctx.ui.notify(
-			`No ${PROJECT_FILE} or ${EXTENSION}.${DOCUMENTS_KEY} found`,
+			`No ${PROJECT_FILE} or ${EXTENSION}.${FRAGMENTS_KEY} found`,
 			"warning",
 		);
 		return;
 	}
 	if (resolved.kind === "malformed") {
 		ctx.ui.notify(
-			`pin-document: ${resolved.path} is not a list of documents`,
+			`prompt-fragment: ${resolved.path} is not a list of fragments`,
 			"error",
 		);
 		return;
 	}
 
 	const { text, missing } = build(
-		resolved.documents,
+		resolved.fragments,
 		dirname(resolved.configPath),
 		ctx.cwd,
 	);
-	const total = resolved.documents.length;
+	const total = resolved.fragments.length;
 	// Rule of thumb: four characters per token.
 	const tokens = Math.ceil(text.length / 4);
 	const failed = missing.length > 0 || resolved.invalid.length > 0;
 	const lines = [
 		`config: ${resolved.configPath}`,
-		`pinned: ${total}`,
+		`fragments: ${total}`,
 		`resolved: ${total - missing.length} of ${total}`,
 		failed
 			? "appended: none (errors below)"
@@ -300,7 +300,7 @@ export function reportPinnedDocuments(ctx: ExtensionCommandContext): void {
 	ctx.ui.notify(lines.join("\n"), failed ? "error" : "info");
 }
 
-export default function pinDocument(pi: ExtensionAPI) {
+export default function promptFragment(pi: ExtensionAPI) {
 	if (!isExtensionEnabled(EXTENSION)) return;
 
 	pi.on("before_agent_start", async (event, ctx) => {
@@ -308,14 +308,14 @@ export default function pinDocument(pi: ExtensionAPI) {
 		if (resolved.kind === "missing") return;
 		if (resolved.kind === "malformed") {
 			ctx.ui.notify(
-				`pin-document: ${resolved.path} is not a list of documents`,
+				`prompt-fragment: ${resolved.path} is not a list of fragments`,
 				"error",
 			);
 			return;
 		}
 
 		const { text, missing } = build(
-			resolved.documents,
+			resolved.fragments,
 			dirname(resolved.configPath),
 			ctx.cwd,
 		);
