@@ -1,7 +1,10 @@
 # notify
 
-Alerts when pi stops and needs attention: a desktop notification, and
-optionally a push to a phone over [ntfy](https://ntfy.sh).
+Alerts when pi stops and needs attention: a local notification — a desktop
+banner, or an Android one through
+[`termux-notification`](https://wiki.termux.com/wiki/Termux-notification) when
+pi runs inside [Termux](https://termux.dev) — and optionally a push to a phone
+over [ntfy](https://ntfy.sh).
 
 | Event | When |
 |-------|------|
@@ -22,8 +25,9 @@ updating.
 ## Configure
 
 `backend` defaults to `termcodes` and `topic` to `""`: terminal notifications
-work straight away, and no phone is pushed to until a topic is set. Settings
-live in the `notify` section of `pi-tweaks.json` in pi's agent directory
+work straight away, and no phone is pushed to until a topic is set. When pi
+runs inside Termux, set `backend` to `termux` instead. Settings live in the
+`notify` section of `pi-tweaks.json` in pi's agent directory
 (`$PI_CODING_AGENT_DIR/pi-tweaks.json`, or `~/.pi/agent/pi-tweaks.json`).
 `/pi-tweaks notify` creates and updates that section; the other sections and
 the `enabled` switch are preserved.
@@ -43,7 +47,7 @@ Set `"enabled": false` to turn the extension off.
 
 | Key | Values | Meaning |
 |-----|--------|---------|
-| `backend` | `off`, `termcodes`, `notify-send` | `termcodes` writes OSC 777, understood by Ghostty, iTerm2 and WezTerm. `notify-send` is a freedesktop notification and needs a desktop session. |
+| `backend` | `off`, `termcodes`, `notify-send`, `termux` | `termcodes` writes OSC 777, understood by Ghostty, iTerm2 and WezTerm. `notify-send` is a freedesktop notification and needs a desktop session. `termux` runs `termux-notification`, the local choice for pi running inside Termux. |
 | `topic` | an ntfy topic, or `""` | Empty for no push. The body POSTs to `<server>/<topic>`; subscribe to that topic in the ntfy app. |
 | `server` | an http(s) URL | Base URL of the ntfy server. Default `https://ntfy.sh`; point it at a self-hosted instance. |
 
@@ -67,6 +71,8 @@ command answers it. Each call reads the section and writes it back.
 ## Requirements
 
 - `notify-send` (package `libnotify`) for the `notify-send` backend.
+- `termux-notification` (package `termux-api`) and the Termux:API app for the
+  `termux` backend.
 - An ntfy topic for the push. No local client is needed; the extension POSTs
   the message itself.
 

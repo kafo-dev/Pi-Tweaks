@@ -10,7 +10,7 @@
  *   {
  *     "notify": {
  *       "enabled": true,
- *       "backend": "off" | "termcodes" | "notify-send",
+ *       "backend": "off" | "termcodes" | "notify-send" | "termux",
  *       "topic":   "" | "ntfy topic",
  *       "server":  "https://ntfy.sh"
  *     }
@@ -36,9 +36,11 @@
  * false there, and a script must not push to your phone.
  *
  * `termcodes` is OSC 777 (Ghostty, iTerm2, WezTerm); `notify-send` needs a
- * desktop session. A push POSTs the body to the ntfy topic on `server`, which
- * defaults to the hosted `https://ntfy.sh`; subscribe to that topic in the ntfy
- * app to receive it.
+ * desktop session; `termux` runs `termux-notification`, which puts the alert
+ * in the Android notification shade, and suits pi running inside Termux. The
+ * push POSTs the body to the ntfy topic on `server`, which defaults to the
+ * hosted `https://ntfy.sh`; subscribe to that topic in the ntfy app to
+ * receive it.
  */
 
 import { execFile } from "node:child_process";
@@ -71,7 +73,7 @@ const DEFAULTS: Settings = {
 
 /** Allowed values per key. An empty list means "any string". */
 const OPTIONS: Record<keyof Settings, string[]> = {
-	backend: ["off", "termcodes", "notify-send"],
+	backend: ["off", "termcodes", "notify-send", "termux"],
 	topic: [],
 	server: [],
 };
@@ -98,9 +100,23 @@ function describe(settings: Settings): string {
 	return `notify: ${values.join(", ")}`;
 }
 
+/**
+ * The notification id the app reuses: Android replaces a notification whose id
+ * it already shows, so alerts do not stack up one per turn.
+ */
+const TERMUX_ID = "pi";
+
 function notifyLocal(settings: Settings, body: string) {
 	if (settings.backend === "notify-send") {
 		execFile("notify-send", ["Pi", body], () => {});
+	} else if (settings.backend === "termux") {
+		// pi runs inside Termux, so the terminal and the device are one and the
+		// same: the alert belongs in the notification shade.
+		execFile(
+			"termux-notification",
+			["-t", "Pi", "-i", TERMUX_ID, "-c", body],
+			() => {},
+		);
 	} else if (settings.backend === "termcodes" && process.stdout.isTTY) {
 		process.stdout.write(`\x1b]777;notify;Pi;${body}\x07`);
 	}
