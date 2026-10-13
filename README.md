@@ -55,7 +55,7 @@ start (or `/reload`).
 | Section | Settings |
 |---------|----------|
 | `pi-bash-timeout` | `timeoutSeconds` (default 32) |
-| `notify` | `backend`, `topic`, `server`; `/pi-tweaks notify` writes them back here |
+| `notify` | `backend`, `topic`, `server`, `token`; `/pi-tweaks notify` writes them back here |
 | `prompt-fragment` | `fragments`: paths whose full text is prepended to the system prompt |
 | `exit-alias` | `enabled` only |
 | `snippet` | `enabled` only |

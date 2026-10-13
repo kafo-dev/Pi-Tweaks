@@ -12,7 +12,8 @@
  *       "enabled": true,
  *       "backend": "off" | "termcodes" | "notify-send" | "termux",
  *       "topic":   "" | "ntfy topic",
- *       "server":  "https://ntfy.sh"
+ *       "server":  "https://ntfy.sh",
+ *       "token":   "" | "ntfy access token"
  *     }
  *   }
  *
@@ -26,6 +27,7 @@
  *   /pi-tweaks notify backend <value>
  *   /pi-tweaks notify topic <topic|off>
  *   /pi-tweaks notify server <url>
+ *   /pi-tweaks notify token <value|off>
  *   /pi-tweaks notify test                fire a dialog to exercise the path
  *
  * The command reads and writes the section on every call. pi loads each
@@ -39,8 +41,9 @@
  * desktop session; `termux` runs `termux-notification`, which puts the alert
  * in the Android notification shade, and suits pi running inside Termux. The
  * push POSTs the body to the ntfy topic on `server`, which defaults to the
- * hosted `https://ntfy.sh`; subscribe to that topic in the ntfy app to
- * receive it.
+ * hosted `https://ntfy.sh`, and carries `token` as a bearer token when one is
+ * set, which a server with authentication enabled requires; subscribe to that
+ * topic in the ntfy app to receive it. A report masks the token.
  */
 
 import { execFile } from "node:child_process";
@@ -63,12 +66,14 @@ interface Settings {
 	backend: string;
 	topic: string;
 	server: string;
+	token: string;
 }
 
 const DEFAULTS: Settings = {
 	backend: "termcodes",
 	topic: "",
 	server: "https://ntfy.sh",
+	token: "",
 };
 
 /** Allowed values per key. An empty list means "any string". */
@@ -76,6 +81,7 @@ const OPTIONS: Record<keyof Settings, string[]> = {
 	backend: ["off", "termcodes", "notify-send", "termux"],
 	topic: [],
 	server: [],
+	token: [],
 };
 
 const KEYS = Object.keys(OPTIONS) as (keyof Settings)[];
@@ -95,8 +101,21 @@ function saveSettings(settings: Settings) {
 	updateSection(EXTENSION, { ...settings });
 }
 
+/**
+ * Keys whose value never goes into a report: an access token belongs in the
+ * file, and the command prints the path of that file.
+ */
+const SECRET_KEYS: ReadonlySet<keyof Settings> = new Set(["token"]);
+
+/** One setting as a report prints it: an empty value shows as "(off)". */
+function show(key: keyof Settings, value: string): string {
+	if (value === "") return "(off)";
+	if (!SECRET_KEYS.has(key)) return value;
+	return value.length > 8 ? `${value.slice(0, 8)}…` : "…";
+}
+
 function describe(settings: Settings): string {
-	const values = KEYS.map((key) => `${key}=${settings[key] || "(off)"}`);
+	const values = KEYS.map((key) => `${key}=${show(key, settings[key])}`);
 	return `notify: ${values.join(", ")}`;
 }
 
@@ -128,9 +147,13 @@ function notifyNtfy(settings: Settings, body: string) {
 	if (!settings.server) return;
 	const server = settings.server.replace(/\/+$/, "");
 	const url = `${server}/${encodeURIComponent(settings.topic)}`;
+	const headers: Record<string, string> = { Title: "Pi", Tags: "robot" };
+	// A server with authentication enabled answers `40301 forbidden` to an
+	// anonymous publish, so the token rides along when one is set.
+	if (settings.token) headers.Authorization = `Bearer ${settings.token}`;
 	void fetch(url, {
 		method: "POST",
-		headers: { Title: "Pi", Tags: "robot" },
+		headers,
 		body,
 	}).catch(() => {});
 }
@@ -175,12 +198,12 @@ export async function runNotify(
 		return;
 	}
 	if (!value) {
-		ctx.ui.notify(`${name} = ${settings[key] || "(off)"}`, "info");
+		ctx.ui.notify(`${name} = ${show(key, settings[key])}`, "info");
 		return;
 	}
 
-	if (key === "topic" && value === "off") {
-		settings.topic = "";
+	if ((key === "topic" || key === "token") && value === "off") {
+		settings[key] = "";
 		saveSettings(settings);
 		ctx.ui.notify(describe(settings), "info");
 		return;
