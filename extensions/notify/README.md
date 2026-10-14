@@ -11,10 +11,8 @@ over [ntfy](https://ntfy.sh).
 | `agent_settled` | pi finished the turn and is waiting for a reply |
 | `ui_prompt_start` | pi is blocked on a confirm / select / input / editor dialog |
 
-An abort does not suppress the alert by itself. The retired `pi-stop` extension
-announced its aborts with an event on pi's shared event bus, and `notify` skips
-the settle that event names; Escape and Ctrl+C abort the same way without
-announcing it, so they alert like any other settle.
+An abort does not suppress the alert. Escape and Ctrl+C stop the turn, and
+`notify` treats the settle that follows like any other.
 
 ## Install
 

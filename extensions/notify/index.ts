@@ -230,22 +230,7 @@ export async function runNotify(
 export default function (pi: ExtensionAPI) {
 	if (!isExtensionEnabled(EXTENSION)) return;
 
-	// The retired pi-stop extension announced an intentional abort on this bus,
-	// so the settle it causes is not news. The listener stays for the archived
-	// copy, loadable with `pi -e .archived/pi-stop.ts`; Escape and Ctrl+C abort
-	// without announcing.
-	let turnAborted = false;
-	pi.events.on("turn-aborted", () => {
-		turnAborted = true;
-	});
-	pi.on("agent_start", () => {
-		turnAborted = false;
-	});
 	pi.on("agent_settled", (_event, ctx) => {
-		if (turnAborted) {
-			turnAborted = false;
-			return;
-		}
 		notifyUser(ctx, "Ready for input");
 	});
 	pi.on("ui_prompt_start", (event, ctx) =>
