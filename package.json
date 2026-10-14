@@ -8,6 +8,9 @@
 		"type": "git",
 		"url": "git+https://github.com/kafo-dev/Pi-Tweaks.git"
 	},
+	"engines": {
+		"node": ">=22.19.0"
+	},
 	"keywords": [
 		"pi-package"
 	],
