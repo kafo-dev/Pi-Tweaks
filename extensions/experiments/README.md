@@ -133,3 +133,57 @@ The XDG trash lives at `$XDG_DATA_HOME/Trash` (default
 `~/.local/share/Trash`). The sandbox wrapper binds it read-write, so a move
 from a sandboxed pi lands normally; a failed move is reported and nothing is
 lost.
+
+## `move-host.ts`
+
+Hypothesis: a session is a file, so the machine that runs it can change
+without losing the conversation; only the working tree and the transcript
+have to travel.
+
+`/move-host [user@]host[:port] [--force]` names the destination. The
+destination is an SSH alias from `~/.ssh/config` — whose entry may carry its
+own `Port` and `User` — or a `[user@]host[:port]` form for a host without a
+config entry. An empty or malformed argument, a non-TUI run, a session
+without a file, and a target without `tmux` are refused.
+
+The session stops at the next safe boundary and resumes on the target:
+
+- issued while the session is idle, the move runs at once and no turn
+  follows;
+- issued while a turn streams, the move waits for the first `turn_end` that
+  carries tool results, aborts the run, and resumes with a prompt that
+  continues the interrupted work;
+- a run that settles before a safe boundary arrives moves without a prompt.
+
+The working directory's contents copy to the same absolute path on the
+target, minus the regenerable directories in `exclude`. A populated target
+path is refused unless `--force` is given. A move started from the home
+directory copies no files, because both hosts call it `/home/<user>` and hold
+different configuration there.
+
+The transcript lands in the target's session store and starts inside a
+detached `tmux` session, so it outlives the SSH child and the source pi's
+exit. The move prints the `ssh <host> -t tmux attach -t pi-move-<id>` command
+that reattaches. The copied session carries a `custom` marker; a settled move
+also carries the notice as a `custom_message`, and a continuing move passes
+it as a positional prompt. A failure leaves the source session running and
+reports the error.
+
+```json
+{
+  "experiment-move-host": {
+    "enabled": true,
+    "exclude": ["node_modules", "dist"]
+  }
+}
+```
+
+`exclude` replaces the default list: `node_modules`, `.venv`, `venv`,
+`__pycache__`, `.mypy_cache`, `.pytest_cache`, `.ruff_cache`, `dist`, `build`,
+`target`, `coverage`, `.next`, `.nuxt`, `.turbo`, `.cache`. An empty array
+copies everything; `.git` stays, because it holds history rather than build
+output.
+
+The `extras/pi` sandbox hides `$HOME` and binds no `~/.ssh`, so a sandboxed
+run cannot read an SSH key. Add an `ro ~/.ssh` line to
+`~/.pi/wrapper-config.txt` before using the command from a sandboxed session.

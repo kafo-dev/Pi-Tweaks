@@ -18,7 +18,8 @@ as `/skill:browser-tools` and `/skill:web-tools`; the packaged extensions are
 loaded at startup. `notify` alerts on the terminal out of the box; its push
 stays off until a topic is set. The experimental extensions in
 `extensions/experiments/` are loaded too, but each registers nothing until its section is enabled in
-`pi-tweaks.json` (`experiment-prune-sessions`, `experiment-pop`, `experiment-url`).
+`pi-tweaks.json` (`experiment-prune-sessions`, `experiment-pop`,
+`experiment-url`, `experiment-move-host`).
 
 ## Configuration
 

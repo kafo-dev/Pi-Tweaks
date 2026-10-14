@@ -32,7 +32,8 @@
 			"./extensions/snippet.ts",
 			"./extensions/experiments/prune-sessions.ts",
 			"./extensions/experiments/pop.ts",
-			"./extensions/experiments/url.ts"
+			"./extensions/experiments/url.ts",
+			"./extensions/experiments/move-host.ts"
 		],
 		"skills": [
 			"./skills/browser-tools",
