@@ -7,14 +7,20 @@ set -eu
 cd "$(git rev-parse --show-toplevel)"
 
 bin=node_modules/.bin
-if [ ! -x "$bin/biome" ] || [ ! -x "$bin/tsc" ]; then
-	printf '%s\n' 'pre-commit: dev tools missing; run `npm install` first' >&2
-	exit 1
-fi
+for tool in prettier eslint tsc; do
+	if [ ! -x "$bin/$tool" ]; then
+		printf '%s\n' "pre-commit: $tool missing; run \`npm install\` first" >&2
+		exit 1
+	fi
+done
 
 fail=0
 
-if ! "$bin/biome" ci .; then
+if ! "$bin/prettier" --check .; then
+	fail=1
+fi
+
+if ! "$bin/eslint" .; then
 	fail=1
 fi
 

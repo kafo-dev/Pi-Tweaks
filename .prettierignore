@@ -1,0 +1,5 @@
+# Docs are hand-formatted; Prettier would realign every table.
+*.md
+node_modules
+package-lock.json
+skills/browser-tools

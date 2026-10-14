@@ -4,19 +4,16 @@ root = true
 charset = utf-8
 end_of_line = lf
 insert_final_newline = true
-
-[*.{ts,js}]
 indent_style = tab
 
 [*.sh]
-indent_style = tab
 shell_variant = posix
 
 [*.json]
 indent_style = space
 indent_size = 2
 
-[{package.json,tsconfig.json,biome.json}]
+[{.prettierrc.json,package.json,tsconfig.json}]
 indent_style = tab
 
 [*.md]

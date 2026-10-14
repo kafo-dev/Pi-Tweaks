@@ -63,6 +63,27 @@ v0.2, whose `whatwg-encoding` dependency is deprecated and makes `npm install`
 print a warning; v1 drops it for `@exodus/bytes` and keeps the API cheerio
 uses. The override can go once cheerio depends on v1 itself.
 
+## Tooling
+
+Formatting and linting use the OpenJS-standard tools: [Prettier][prettier]
+for formatting and [ESLint][eslint] with [typescript-eslint][tseslint] for
+linting. `npm run check` runs the whole gate — `prettier --check`, `eslint`,
+and `tsc --noEmit`; `npm run format` and `npm run lint:fix` rewrite files.
+
+TypeScript needs a note. The compiler behind `tsc` is TypeScript 7, which
+ships no programmatic compiler API, while typescript-eslint still parses with
+the TypeScript 6 API. `package.json` therefore aliases two packages:
+`typescript` to `@typescript/typescript6` (the API typescript-eslint imports)
+and `@typescript/native` to `typescript@7` (the `tsc` binary). This is the
+side-by-side setup the
+[TypeScript 7 release notes](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0)
+recommend. Keep both aliases: remove the TS 6 one and linting breaks; remove
+the TS 7 one and `tsc` breaks.
+
+[prettier]: https://prettier.io
+[eslint]: https://eslint.org
+[tseslint]: https://typescript-eslint.io
+
 ## Layout
 
 - `skills/browser-tools/` is its own subproject. Keep its details (setup, usage,
