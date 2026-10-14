@@ -122,7 +122,6 @@ its own, `/pi-tweaks` prints the subcommands that are available.
 | [`skills/browser-tools/`](skills/browser-tools/) | CDP browser-automation skill. **Read [`skills/browser-tools/NOTICE.md`](skills/browser-tools/NOTICE.md)** for attribution and licensing before using or redistributing. |
 | [`skills/web-tools/`](skills/web-tools/) | Free, keyless web search through Exa's hosted MCP server, plus `web-read`, a local POSIX `sh` reader that turns a URL into LLM-friendly markdown. No API key. See its [README](skills/web-tools/README.md). |
 | [`extras/`](extras/) | `bwrap` sandbox wrapper for the `pi` CLI. See its [README](extras/README.md). |
-| [`.archived/`](.archived/) | Tools retired from the package, kept for reference. See its [README](.archived/README.md). |
 | [`extensions/experiments/`](extensions/experiments/) | Experimental extensions, listed in the manifest but off until enabled in `pi-tweaks.json`. See its [README](extensions/experiments/README.md). |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to contribute — commit message style, etc. |
 | [`LICENSE`](LICENSE) | ISC — this repository's own files. |

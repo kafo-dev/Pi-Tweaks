@@ -15,7 +15,7 @@ file all leave an experiment off (`isExperimentEnabled`). Enable it there, then
 restart pi or run `/reload`.
 
 Experiments are unmaintained relative to the package: they can change or be
-moved to [`.archived/`](../../.archived/) once the hypothesis is settled. A
+dropped once the hypothesis is settled. A
 settled idea that proves beneficial graduates by moving the file next to the
 packaged extensions and dropping the `experiment-` prefix from its
 `pi-tweaks.json` section.
