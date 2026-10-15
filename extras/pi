@@ -136,7 +136,8 @@ if [ "${BWRAP:-1}" = "0" ]; then
 	exec "$real_pi" "$@"
 fi
 
-host=$(hostname | tr -c 'A-Za-z0-9.-' '-')
+host=$(hostname)
+host=$(printf '%s' "$host" | tr -c 'A-Za-z0-9.-' '-')
 
 # Binding $HOME (or an ancestor) read-write would expose the whole home
 # directory, so such a session keeps the project directory read-only and uses
