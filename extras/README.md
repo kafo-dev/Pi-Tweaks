@@ -116,6 +116,7 @@ rw ~/Documents
 rw /home/user/shared
 ro ~/.ssh
 ro /home/user/.config/git
+crw /dev/dri
 ```
 
 `rw <path>` binds the path read-write, `ro <path>` read-only, and a bare path
@@ -124,15 +125,15 @@ counts as `rw`. `~` expands to `$HOME`. Read-write entries mount with
 exist is skipped and the wrapper still starts. Read-only entries mount after
 read-write ones, so a path listed both ways ends up read-only.
 
-The working directory is the exception: the wrapper ignores an `ro` entry that
-names it exactly, because a session started there needs a writable project.
-An entry for a path below the working directory still applies.
+A `c` prefix marks a device path. `crw <path>` mounts with `--dev-bind-try`:
+the sandbox mounts a fresh tmpfs over `/dev`, and `--bind` sets `nodev` on the
+mount, which makes the device nodes under it deny access. `cro <path>` uses
+plain `--ro-bind-try`, `nodev` included, so the node appears but cannot be
+opened; bubblewrap offers no read-only device bind.
 
-A read-write device node, and any read-write path under `/dev`, is mounted with
-`--dev-bind-try` instead: the sandbox mounts a fresh tmpfs over `/dev`, and
-`--bind` sets `nodev` on the mount, which makes the device nodes under it deny
-access. A read-only entry always uses `--ro-bind-try`, `nodev` included, so list
-a device node under `rw` to keep it usable.
+The working directory is the exception: the wrapper ignores an `ro` or `cro`
+entry that names it exactly, because a session started there needs a writable
+project. An entry for a path below the working directory still applies.
 
 A path is taken literally: do not quote it, even when it contains spaces.
 Non-absolute entries are ignored with a warning. The wrapper reads the file on
@@ -165,7 +166,7 @@ Under `$HOME` the agent then sees only:
 - the agent directory, the cache directory, the skills tree (`.agents`), the
   scratchpad, and the XDG trash, which the wrapper mounts on every run;
 - `wrapper-config.txt`, read-only;
-- every `rw` path, read-write, and every `ro` path, read-only;
+- every `rw` or `crw` path, read-write, and every `ro` or `cro` path, read-only;
 - the working directory, when the wrapper mounts it read-write.
 
 Everything else is gone rather than read-only. A directory that is not listed
