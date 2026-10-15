@@ -166,8 +166,9 @@ done
 # or any read-write path under /dev, is mounted with --dev-bind-try instead,
 # since --bind marks the mount nodev and blocks the device. Read-only entries
 # mount after the read-write ones, so a path listed both ways ends up
-# read-only. The file is read here, on the host, so it need not be reachable
-# inside the sandbox.
+# read-only; an `ro` entry naming the working directory is ignored, because
+# the session needs a writable project. The file is read here, on the host, so
+# it need not be reachable inside the sandbox.
 
 # The agent cannot see the sandbox from inside, so it is told about it. Without
 # this note a permission error reads as a broken environment, and the agent
@@ -243,6 +244,13 @@ if [ -f "$config_file" ]; then
 		path=$(trim "$path")
 		[ -n "$path" ] || continue
 		resolve_path "$path" || continue
+		# The project directory mounts read-write before this bind, so an
+		# `ro` entry naming it would win and leave the session without a
+		# writable project. Starting pi inside a path means working there,
+		# so skip the entry; entries below it still apply.
+		if [ "$home_readonly" = 0 ] && [ "${path%/}" = "$cwd" ]; then
+			continue
+		fi
 		set -- --ro-bind-try "$path" "$path" "$@"
 	done <"$config_file"
 fi

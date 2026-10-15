@@ -124,6 +124,10 @@ counts as `rw`. `~` expands to `$HOME`. Read-write entries mount with
 exist is skipped and the wrapper still starts. Read-only entries mount after
 read-write ones, so a path listed both ways ends up read-only.
 
+The working directory is the exception: the wrapper ignores an `ro` entry that
+names it exactly, because a session started there needs a writable project.
+An entry for a path below the working directory still applies.
+
 A read-write device node, and any read-write path under `/dev`, is mounted with
 `--dev-bind-try` instead: the sandbox mounts a fresh tmpfs over `/dev`, and
 `--bind` sets `nodev` on the mount, which makes the device nodes under it deny
