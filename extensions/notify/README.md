@@ -56,7 +56,9 @@ account. Pick a topic that is hard to guess, because anyone who knows it can
 publish to it on the public server. A self-hosted server with authentication
 enabled rejects an anonymous publish with `40301 forbidden`, which is where
 `token` comes in: `ntfy token add` mints one, and the extension sends it with
-every alert.
+every alert. The push title names the host and the chat, so a topic shared by
+several machines identifies which one needs attention: the chat is the session
+name, or the session file when the session has no name.
 
 ## Commands
 

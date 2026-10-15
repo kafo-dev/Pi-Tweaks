@@ -43,10 +43,13 @@
  * push POSTs the body to the ntfy topic on `server`, which defaults to the
  * hosted `https://ntfy.sh`, and carries `token` as a bearer token when one is
  * set, which a server with authentication enabled requires; subscribe to that
- * topic in the ntfy app to receive it. A report masks the token.
+ * topic in the ntfy app to receive it. A report masks the token. One topic can
+ * hear from several hosts and sessions, so the push names both in its title:
+ * the hostname, and the session name or, for an unnamed session, its file.
  */
 
 import { execFile } from "node:child_process";
+import { hostname } from "node:os";
 import type {
 	ExtensionAPI,
 	ExtensionCommandContext,
@@ -141,13 +144,39 @@ function notifyLocal(settings: Settings, body: string) {
 	}
 }
 
+/**
+ * What the phone shows for the chat: the session name, its session file when
+ * the session carries no name, and the working directory before a file exists.
+ */
+function chatLabel(ctx: ExtensionContext): string {
+	const name = ctx.sessionManager.getSessionName();
+	if (name) return name;
+	const file = ctx.sessionManager.getSessionFile();
+	if (file) return file;
+	return ctx.cwd;
+}
+
+/**
+ * Encode a header value as an RFC 2047 UTF-8 word when it holds non-ASCII.
+ * Node sends header values as Latin-1, so a non-ASCII hostname, session name,
+ * or path would reach ntfy as mojibake. ntfy decodes the word back; an ASCII
+ * value passes through, so the common case stays readable in logs.
+ */
+function encodeHeaderValue(value: string): string {
+	if (/^[\x20-\x7e]*$/.test(value)) return value;
+	return `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`;
+}
+
 /** POST the body to the ntfy topic. A failed push is dropped, never thrown. */
-function notifyNtfy(settings: Settings, body: string) {
+function notifyNtfy(settings: Settings, title: string, body: string) {
 	if (!settings.topic) return;
 	if (!settings.server) return;
 	const server = settings.server.replace(/\/+$/, "");
 	const url = `${server}/${encodeURIComponent(settings.topic)}`;
-	const headers: Record<string, string> = { Title: "Pi", Tags: "robot" };
+	const headers: Record<string, string> = {
+		Title: encodeHeaderValue(title),
+		Tags: "robot",
+	};
 	// A server with authentication enabled answers `40301 forbidden` to an
 	// anonymous publish, so the token rides along when one is set.
 	if (settings.token) headers.Authorization = `Bearer ${settings.token}`;
@@ -164,7 +193,9 @@ function notifyUser(ctx: ExtensionContext, body: string) {
 	if (!ctx.hasUI) return;
 	const settings = loadSettings();
 	notifyLocal(settings, body);
-	notifyNtfy(settings, body);
+	// The local banner already sits on the right desktop; the push names the
+	// host and the chat, because one topic can hear from several of each.
+	notifyNtfy(settings, `Pi · ${hostname()} · ${chatLabel(ctx)}`, body);
 }
 
 /**
